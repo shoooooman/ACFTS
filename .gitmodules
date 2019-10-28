@@ -1,3 +1,0 @@
-[submodule "repo"]
-	path = repo
-	url = git@gitlab.ethz.ch:disco-students/hs19/shmori_consensus-free_transaction_systems.git
