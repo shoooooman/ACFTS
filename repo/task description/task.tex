@@ -1,0 +1,101 @@
+\documentclass[a4paper,11pt]{article}
+
+\usepackage{graphicx}
+\usepackage[margin=2.8cm]{geometry}
+\usepackage{wrapfig}
+\usepackage[colorlinks=true,urlcolor=blue,linkcolor=black]{hyperref}
+\usepackage{color}
+\usepackage[english]{babel}
+\usepackage{forloop}
+\usepackage{dirtytalk}
+
+\newenvironment{reqlist}{\par \medskip \noindent \begin{tabular}{cp{0.83\textwidth}r} \\[-24pt]}{\end{tabular}}
+\newcommand\req{\\ \smallskip \smallskip \hspace{0.24cm} $\bullet$\hspace{-0.2cm} & }
+
+\newcounter{num}
+\newcommand\effort[1]{\mbox{(\forloop{num}{0}{\value{num} < #1}{$\star$})}}
+
+
+\begin{document}
+	
+\thispagestyle{empty}
+
+\noindent
+\hrulefill \vspace{6pt}
+
+\noindent
+\includegraphics[viewport=8 8 185 55]{eth_logo_black} \hfill
+\includegraphics[trim=0 0 2 0]{disco-logo-col} \hspace{-6pt} \vspace{-6pt}
+
+\noindent \hrulefill \vspace{4pt}
+
+\hfill Prof.\ R.\ Wattenhofer
+
+\vspace{1em}
+%\noindent BA/SA/GA:
+\vspace{1em}
+
+\noindent \textbf{\LARGE Asynchronous Consensus-Free Transaction Systems} \bigskip
+
+
+\noindent 
+
+\noindent In the distributed computing community, the \emph{consensus} problem and its more practical counterpart, so-called state machine replication, have been extensively studied. More recently, such systems have regained attention by the name of \emph{permissioned blockchain systems}. These permissioned blockchain systems have now become a prominent solution behind resilient, distributed applications. At their core, such systems assume that it is required to solve the consensus problem, thus preventing scalability. However, for many applications, such as payment systems, solving the consensus problem is not necessary.\\
+% Thus, notably, solving the consensus problem can unnecessarily prevent applications from being scalable -- and thus applicable -- to their real-world usage scenarios.\\
+
+\noindent In this thesis, you will develop and evaluate an asynchronous transaction system that pushes the boundaries of scalability by not aiming to solve the consensus problem. In other words, we will build a slightly restricted, but faster form of a permissioned blockchain system. By a
+\begin{wrapfigure}{r}{6.5cm}
+    \vspace{-0.5cm}
+    \includegraphics[width=6.5cm]{network.jpeg}
+    \vspace{-1.5cm}
+\end{wrapfigure}
+\emph{transaction system}, we understand a distributed protocol ensuring that no conflicting transactions can be executed simultaneously. The system will optimize the following evaluation criteria:
+\begin{itemize}
+    \item \textbf{fault-tolerance:} It cannot be assumed that all engaging users behave honestly and follow the protocol.
+    \item \textbf{speed:} Your system should be fast and scalable, e.g.\ to 10k transactions per second with 10k users.
+    \item \textbf{dynamic:} Your system should be capable of evolving over time, e.g.\ allowing to exchange the set of validators.
+\end{itemize}
+While we already have some ideas how such an asynchronous transaction system might look, we are interested in your vision and input on how to build such a system.
+% For the application process, please spend a few minutes brainstorming ideas and try to 
+
+\bigskip
+
+
+\noindent \textbf{Requirements:}
+An interest in algorithmic problems is required. Programming experience in \emph{python} is a great advantage. For this project, the student(s) should be able to solve basic implementation problems independently, while we discuss solutions / new ideas for upcoming problems in weekly meetings!
+% The expected outcome of this project is of theoretic nature; hence, you should be comfortable to formalize both theorems and proofs independently. Progress, open problems and new ideas will be discussed in collaborative (at least) weekly meetings throughout the project!
+\bigskip
+
+
+% \noindent \textbf{Interested? Please contact us for more details!}
+
+\subsection*{Contacts}
+\begin{itemize}
+	\item Roland Schmid: \href{mailto:Roland Schmid <roschmi@ethz.ch>}{\texttt{roschmi@ethz.ch}}, ETZ G94
+	\item Jakub Sliwinski: \href{mailto:Jakub Sliwinski <jsliwinski@ethz.ch>}{\texttt{jsliwinski@ethz.ch}}, ETZ G95
+\end{itemize}
+
+\newpage
+
+
+\subsection*{Thesis Milestones:}
+We denote the following primary tasks mandatory (with a rough estimate for the time that we allocate to the respective task); however, the direction of the project is flexible:
+\begin{reqlist}
+    \req Understand the proposed transaction system concept in detail. & \effort{1}
+    \req Find out how to run an experiment on Amazon cloud services. & \effort{1}
+    \req Implement a server program running a permissioned committee node. & \effort{4}
+    \req Implement a client program issuing transactions. & \effort{2}
+    \req Benchmark the bottlenecks and scalability of the transaction system locally. & \effort{2}
+    \req Write report \& present findings & \effort{2}
+\end{reqlist}
+
+\vspace{5mm}
+
+\noindent
+There are several extensions to this project that we can think of:
+\begin{itemize}
+    \item Implement a method for (new) committee members to join/leave the system securely.
+    \item Run a benchmark experiment in the Amazon cloud environment.
+\end{itemize}
+
+\end{document}
