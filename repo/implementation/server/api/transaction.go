@@ -2,12 +2,10 @@ package api
 
 import (
 	"acfts/db/model"
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -23,15 +21,15 @@ func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
 		panic(err)
 	}
 
-	// Convert transaction struct to binary
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, &transaction)
-	fmt.Printf("buf=% x\n", buf.Bytes())
+	// Convert transaction struct to bytes to get its hash
+	buf := []byte(fmt.Sprintf("%v", transaction))
 
+	// Get hash using SHA256
 	h := crypto.Hash.New(crypto.SHA256)
-	h.Write(([]byte)(buf.Bytes()))
+	h.Write(buf)
 	hashed := h.Sum(nil)
 
+	// Get signature using ellipse curve cryptography
 	r, s, err := ecdsa.Sign(rand.Reader, privateKey, hashed)
 	if err != nil {
 		panic(err)
