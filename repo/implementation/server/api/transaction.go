@@ -2,6 +2,14 @@ package api
 
 import (
 	"acfts/db/model"
+	"bytes"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/binary"
+	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
 
@@ -9,9 +17,36 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-func makeSignature(transaction model.Transaction) string {
-	// privateKey := getPrivateKey()
-	return "hogehoge"
+func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+
+	// Convert transaction struct to binary
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, &transaction)
+	fmt.Printf("buf=% x\n", buf.Bytes())
+
+	h := crypto.Hash.New(crypto.SHA256)
+	h.Write(([]byte)(buf.Bytes()))
+	hashed := h.Sum(nil)
+
+	r, s, err := ecdsa.Sign(rand.Reader, privateKey, hashed)
+	if err != nil {
+		panic(err)
+	}
+
+	// for verification (client side)
+	// if ecdsa.Verify(&privateKey.PublicKey, hashed, r, s) {
+	// 	fmt.Println("Verifyed!")
+	// }
+
+	return r, s
+}
+
+func unlockUTXO(utxo Output, key string) bool {
+	return true
 }
 
 // [tmp] for search_id of outputs
@@ -44,6 +79,13 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 			// 	})
 			// 	return
 			// }
+
+			if !unlockUTXO(utxo, input.key) {
+				c.JSON(http.StatusOK, gin.H{
+					"message": "Could not unlock UTXO.",
+				})
+				return
+			}
 			inputAmount += utxo.Amount
 		}
 
@@ -60,22 +102,29 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		for _, input := range inputs {
+		for i, input := range inputs {
 			utxo := input.UTXO
 			db.Model(&utxo).Where("search_id = ?", utxo.SearchID).Update("used", true)
 			// db.Unscoped().Delete(&utxo)
+
+			transaction.Inputs[i].UTXO = utxo
 		}
-		for _, output := range outputs {
+		for i, output := range outputs {
 			output.SearchID = "search" + strconv.Itoa(seq)
 			seq++
 			db.Create(&output)
+
+			db.Where("search_id = ?", output.SearchID).First(&output)
+			transaction.Outputs[i] = output
 		}
 
-		signature := makeSignature(transaction)
+		r, s := createSignature(transaction)
 
 		c.JSON(http.StatusOK, gin.H{
-			"message":   "Verified this transaction.",
-			"signature": signature,
+			"message":     "Verified this transaction.",
+			"transaction": transaction,
+			"signature1":  r,
+			"signature2":  s,
 		})
 	}
 }

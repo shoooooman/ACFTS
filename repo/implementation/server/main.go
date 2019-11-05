@@ -16,7 +16,6 @@ func initDB() *gorm.DB {
 		panic("failed to connect database")
 	}
 
-	// db.AutoMigrate(&model.Transaction{})
 	db.AutoMigrate(&model.Output{})
 
 	return db
