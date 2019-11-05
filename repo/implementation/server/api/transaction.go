@@ -45,12 +45,54 @@ func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
 	return r, s
 }
 
-func unlockUTXO(utxo Output, key string) bool {
+func unlockUTXO(utxo model.Output, key string) bool {
 	return true
 }
 
 // [tmp] for search_id of outputs
 var seq = 1
+
+type inputJSON struct {
+	UTXO outputJSON `json:"utxo"`
+	Key  string     `json:"key"`
+}
+
+type outputJSON struct {
+	SearchID string `json:"id"`
+	Amount   int    `json:"amount"`
+	Used     bool   `json:"used"`
+}
+
+type transactionJSON struct {
+	Inputs  []inputJSON  `json:"inputs"`
+	Outputs []outputJSON `json:"outputs"`
+}
+
+func convertOutput(output model.Output) outputJSON {
+	json := outputJSON{}
+	json.SearchID = output.SearchID
+	json.Amount = output.Amount
+	json.Used = output.Used
+	return json
+}
+
+func convertTransaction(transaction model.Transaction) transactionJSON {
+	json := transactionJSON{}
+
+	json.Inputs = make([]inputJSON, len(transaction.Inputs))
+	for i, input := range transaction.Inputs {
+		utxo := input.UTXO
+		json.Inputs[i].UTXO = convertOutput(utxo)
+		json.Inputs[i].Key = input.Key
+	}
+
+	json.Outputs = make([]outputJSON, len(transaction.Outputs))
+	for i, output := range transaction.Outputs {
+		json.Outputs[i] = convertOutput(output)
+	}
+
+	return json
+}
 
 // VerifyTransaction is
 func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
@@ -80,7 +122,7 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 			// 	return
 			// }
 
-			if !unlockUTXO(utxo, input.key) {
+			if !unlockUTXO(utxo, input.Key) {
 				c.JSON(http.StatusOK, gin.H{
 					"message": "Could not unlock UTXO.",
 				})
@@ -107,6 +149,7 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 			db.Model(&utxo).Where("search_id = ?", utxo.SearchID).Update("used", true)
 			// db.Unscoped().Delete(&utxo)
 
+			db.Where("search_id = ?", utxo.SearchID).First(&utxo)
 			transaction.Inputs[i].UTXO = utxo
 		}
 		for i, output := range outputs {
@@ -120,9 +163,10 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 
 		r, s := createSignature(transaction)
 
+		json := convertTransaction(transaction)
 		c.JSON(http.StatusOK, gin.H{
 			"message":     "Verified this transaction.",
-			"transaction": transaction,
+			"transaction": json,
 			"signature1":  r,
 			"signature2":  s,
 		})
