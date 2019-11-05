@@ -1,11 +1,8 @@
 package model
 
-import "github.com/jinzhu/gorm"
-
 // Transaction is
 type Transaction struct {
-	gorm.Model
-	From   string
-	To     string
-	Amount int
+	// gorm.Model
+	Inputs  []Input  `json:"inputs"`
+	Outputs []Output `json:"outputs"`
 }

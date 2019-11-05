@@ -16,7 +16,8 @@ func initDB() *gorm.DB {
 		panic("failed to connect database")
 	}
 
-	db.AutoMigrate(&model.Transaction{})
+	// db.AutoMigrate(&model.Transaction{})
+	db.AutoMigrate(&model.Output{})
 
 	return db
 }
@@ -26,7 +27,7 @@ func initRoute(db *gorm.DB) *gin.Engine {
 
 	// APIs
 	r.GET("/", api.Ping())
-	r.GET("/transaction", api.SendTransaction(db))
+	r.POST("/transaction", api.VerifyTransaction(db))
 
 	return r
 }
