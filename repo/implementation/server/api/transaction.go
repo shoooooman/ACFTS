@@ -41,7 +41,7 @@ func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
 
 func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 	// Convert transaction struct to bytes to get its hash
-	buf := []byte(fmt.Sprintf("%v", utxo))
+	buf := []byte(fmt.Sprintf("%v", utxo.SearchID))
 
 	// Get a hash value using SHA256
 	h := crypto.Hash.New(crypto.SHA256)
