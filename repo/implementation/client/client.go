@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -55,9 +56,9 @@ type signature struct {
 	s *big.Int
 }
 
-func getSig(address *ecdsa.PublicKey) signature {
+func getSig(utxo model.Output) signature {
 	// Convert addresses to bytes to get its hash
-	buf := []byte(fmt.Sprintf("%v%v", address.X, address.Y))
+	buf := []byte(fmt.Sprintf("%v%v%v", utxo.Address1, utxo.Address2, utxo.PreviousHash))
 
 	// Get hash using SHA256
 	h := crypto.Hash.New(crypto.SHA256)
@@ -74,16 +75,17 @@ func getSig(address *ecdsa.PublicKey) signature {
 	return sig
 }
 
-func createInputStr(addresses []*ecdsa.PublicKey) string {
-	sigs := make([]signature, len(addresses))
+func createInputStr(utxos []model.Output) string {
+	sigs := make([]signature, len(utxos))
 	inputs := ""
-	for i, address := range addresses {
-		sigs[i] = getSig(address)
+	for i, utxo := range utxos {
+		sigs[i] = getSig(utxo)
 		inputStr := `
 		{
 			"utxo": {
-				"address1": "` + address.X.String() + `",
-				"address2": "` + address.Y.String() + `"
+				"address1": "` + utxo.Address1 + `",
+				"address2": "` + utxo.Address2 + `",
+				"previous_hash": "` + utxo.PreviousHash + `"
 			},
 			"sig1": "` + sigs[i].r.String() + `",
 			"sig2": "` + sigs[i].s.String() + `"
@@ -95,6 +97,12 @@ func createInputStr(addresses []*ecdsa.PublicKey) string {
 	inputs = "[" + inputs[:len(inputs)-1] + "]"
 
 	return inputs
+}
+
+func getPreviousHash(previous string) string {
+	bytes := sha256.Sum256([]byte(previous))
+	num := fmt.Sprintf("%x", bytes)
+	return string(num)
 }
 
 var privateKey *ecdsa.PrivateKey
@@ -109,11 +117,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	// Get a public key (address)
 	publicKey := &privateKey.PublicKey
-	utxos := []*ecdsa.PublicKey{publicKey}
+
+	utxo1 := model.Output{Address1: publicKey.X.String(), Address2: publicKey.Y.String(), PreviousHash: "genesis"}
+	utxos := []model.Output{utxo1}
 	inputs := createInputStr(utxos)
+	hash := getPreviousHash(inputs)
 
 	jsonStr := `
 {
@@ -122,12 +131,14 @@ func main() {
 		{
 			"amount": 150,
 			"address1": "foofoo1",
-			"address2": "foofoo2"
+			"address2": "foofoo2",
+			"previous_hash": "` + hash + `"
 		},
 		{
 			"amount": 50,
 			"address1": "barbar1",
-			"address2": "barbar2"
+			"address2": "barbar2",
+			"previous_hash": "` + hash + `"
 		}
 	]
 }`

@@ -40,7 +40,7 @@ func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
 
 func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 	// Convert transaction struct to bytes to get its hash
-	buf := []byte(fmt.Sprintf("%v%v", utxo.Address1, utxo.Address2))
+	buf := []byte(fmt.Sprintf("%v%v%v", utxo.Address1, utxo.Address2, utxo.PreviousHash))
 
 	// Get a hash value using SHA256
 	h := crypto.Hash.New(crypto.SHA256)
@@ -84,10 +84,11 @@ type inputJSON struct {
 
 // Just for responses
 type outputJSON struct {
-	Amount   int    `json:"amount"`
-	Address1 string `json:"address1"`
-	Address2 string `json:"address2"`
-	Used     bool   `json:"used"`
+	Amount       int    `json:"amount"`
+	Address1     string `json:"address1"`
+	Address2     string `json:"address2"`
+	PreviousHash string `json:"previous_hash"`
+	Used         bool   `json:"used"`
 }
 
 // Just for responses
@@ -102,6 +103,7 @@ func convertOutput(output model.Output) outputJSON {
 	json.Amount = output.Amount
 	json.Address1 = output.Address1
 	json.Address2 = output.Address2
+	json.PreviousHash = output.PreviousHash
 	json.Used = output.Used
 	return json
 }
@@ -137,7 +139,7 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 		for _, input := range inputs {
 			utxo := input.UTXO
 			count := 0
-			db.Where("address1 = ? AND address2 = ?", utxo.Address1, utxo.Address2).First(&utxo).Count(&count)
+			db.Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).First(&utxo).Count(&count)
 			if count == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"message": "Input is not valid.",
@@ -185,19 +187,17 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 
 		for i, input := range inputs {
 			utxo := input.UTXO
-			db.Model(&utxo).Where("address1 = ? AND address2 = ?", utxo.Address1, utxo.Address2).Update("used", true)
+			db.Model(&utxo).Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).Update("used", true)
 			// db.Unscoped().Delete(&utxo)
 
-			db.Where("address1 = ? AND address2 = ?", utxo.Address1, utxo.Address2).First(&utxo)
+			db.Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).First(&utxo)
 			transaction.Inputs[i].UTXO = utxo
 		}
 
-		// FIXME: dummy outputs
-		// Needs to add outputs to requests
 		for i, output := range outputs {
 			db.Create(&output)
 
-			db.Where("address1 = ? AND address2 = ?", output.Address1, output.Address2).First(&output)
+			db.Where("address1 = ? AND address2 = ? AND previous_hash = ?", output.Address1, output.Address2, output.PreviousHash).First(&output)
 			transaction.Outputs[i] = output
 		}
 
