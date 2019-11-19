@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
@@ -76,9 +75,6 @@ func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 	}
 	return false
 }
-
-// [tmp] for incremented number of outputs
-var seq = 1
 
 type inputJSON struct {
 	UTXO       outputJSON `json:"utxo"`
@@ -199,9 +195,6 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 		// FIXME: dummy outputs
 		// Needs to add outputs to requests
 		for i, output := range outputs {
-			output.Address1 = "0000" + strconv.Itoa(seq)
-			output.Address2 = "1111" + strconv.Itoa(seq)
-			seq++
 			db.Create(&output)
 
 			db.Where("address1 = ? AND address2 = ?", output.Address1, output.Address2).First(&output)
