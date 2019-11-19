@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"strconv"
 
 	"github.com/jinzhu/gorm"
 
@@ -113,14 +114,69 @@ func createInputStr(utxos []model.Output) string {
 	return inputs
 }
 
+func createOutputStr(ops []model.Output, hash string) string {
+	outputs := ""
+	for _, op := range ops {
+		outputStr := `
+		{
+			"amount": ` + strconv.Itoa(op.Amount) + `,
+			"address1": "` + op.Address1 + `",
+			"address2": "` + op.Address2 + `",
+			"previous_hash": "` + hash + `"
+		},`
+
+		outputs += outputStr
+	}
+	// Remove the last ','
+	outputs = "[" + outputs[:len(outputs)-1] + "]"
+
+	return outputs
+}
+
 func getPreviousHash(previous string) string {
 	bytes := sha256.Sum256([]byte(previous))
 	num := fmt.Sprintf("%x", bytes)
 	return string(num)
 }
 
+var keys []*ecdsa.PrivateKey
+
 // Get a private key from a public key (PublicKey.X + PublicKey.Y)
 var pub2Pri map[string]*ecdsa.PrivateKey
+
+type simpleTx struct {
+	From    []int
+	To      []int
+	Amounts []int
+}
+
+func createJSONStr(tx simpleTx) string {
+	utxos := make([]model.Output, len(tx.From))
+	for i, index := range tx.From {
+		priKey := keys[index]
+		pubKey := &priKey.PublicKey
+		// TODO: 使えるutxoのprevious hashをDBから取ってくる
+		utxos[i] = model.Output{Address1: pubKey.X.String(), Address2: pubKey.Y.String(), PreviousHash: "genesis"}
+	}
+	inputs := createInputStr(utxos)
+	hash := getPreviousHash(inputs)
+
+	ops := make([]model.Output, len(tx.To))
+	for i, index := range tx.To {
+		priKey := keys[index]
+		pubKey := &priKey.PublicKey
+		ops[i] = model.Output{Amount: tx.Amounts[i], Address1: pubKey.X.String(), Address2: pubKey.Y.String(), PreviousHash: hash}
+	}
+	outputs := createOutputStr(ops, hash)
+
+	jsonStr := `
+{
+	"inputs": ` + inputs + `,
+	"outputs": ` + outputs + `
+}`
+
+	return jsonStr
+}
 
 func main() {
 	url := "http://localhost:8080/transaction"
@@ -129,7 +185,7 @@ func main() {
 
 	// Generate private keys
 	const numClients = 3
-	keys := make([]*ecdsa.PrivateKey, numClients)
+	keys = make([]*ecdsa.PrivateKey, numClients)
 	pub2Pri = make(map[string]*ecdsa.PrivateKey)
 	for i := 0; i < numClients; i++ {
 		var err error
@@ -142,37 +198,51 @@ func main() {
 	}
 
 	// Make transactions
-	publicKey := &keys[0].PublicKey
-	utxo1 := model.Output{Address1: publicKey.X.String(), Address2: publicKey.Y.String(), PreviousHash: "genesis"}
-	utxos := []model.Output{utxo1}
-	inputs := createInputStr(utxos)
-	hash := getPreviousHash(inputs)
+	txs := []simpleTx{
+		{From: []int{0}, To: []int{1}, Amounts: []int{200}},
+		{From: []int{1}, To: []int{2}, Amounts: []int{200}},
+	}
 
-	jsonStr := `
-{
-	"inputs": ` + inputs + `,
-	"outputs": [
-		{
-			"amount": 150,
-			"address1": "foofoo1",
-			"address2": "foofoo2",
-			"previous_hash": "` + hash + `"
-		},
-		{
-			"amount": 50,
-			"address1": "barbar1",
-			"address2": "barbar2",
-			"previous_hash": "` + hash + `"
-		}
-	]
-}`
+	for i := 0; i < len(txs); i++ {
+		jsonStr := createJSONStr(txs[i])
+		fmt.Println(jsonStr)
 
-	fmt.Println(jsonStr)
+		// FIXME: To get addresses to insert them into db as a genesis transaction
+		var dummy string
+		fmt.Scan(&dummy)
 
-	// FIXME: To get addresses to insert them into db as a genesis transaction
-	var dummy string
-	fmt.Scan(&dummy)
+		resp := post(url, jsonStr)
+		// TODO: respのoutputをDBに入れる
+		fmt.Println(resp)
+	}
 
-	resp := post(url, jsonStr)
-	fmt.Println(resp)
+	// 	publicKey := &keys[0].PublicKey
+	// 	utxo1 := model.Output{Address1: publicKey.X.String(), Address2: publicKey.Y.String(), PreviousHash: "genesis"}
+	// 	utxos := []model.Output{utxo1}
+	// 	inputs := createInputStr(utxos)
+	// 	hash := getPreviousHash(inputs)
+	//
+	// 	jsonStr := `
+	// {
+	// 	"inputs": ` + inputs + `,
+	// 	"outputs": [
+	// 		{
+	// 			"amount": 150,
+	// 			"address1": "foofoo1",
+	// 			"address2": "foofoo2",
+	// 			"previous_hash": "` + hash + `"
+	// 		},
+	// 		{
+	// 			"amount": 50,
+	// 			"address1": "barbar1",
+	// 			"address2": "barbar2",
+	// 			"previous_hash": "` + hash + `"
+	// 		}
+	// 	]
+	// }`
+	//
+	// 	fmt.Println(jsonStr)
+
+	// resp := post(url, jsonStr)
+	// fmt.Println(resp)
 }
