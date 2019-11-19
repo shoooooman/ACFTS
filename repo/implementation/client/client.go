@@ -55,14 +55,9 @@ type signature struct {
 	s *big.Int
 }
 
-func getSig(id string) signature {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-	if err != nil {
-		panic(err)
-	}
-
-	// Convert transaction struct to bytes to get its hash
-	buf := []byte(fmt.Sprintf("%v", id))
+func getSig(address *ecdsa.PublicKey) signature {
+	// Convert addresses to bytes to get its hash
+	buf := []byte(fmt.Sprintf("%v%v", address.X, address.Y))
 
 	// Get hash using SHA256
 	h := crypto.Hash.New(crypto.SHA256)
@@ -79,15 +74,16 @@ func getSig(id string) signature {
 	return sig
 }
 
-func createInputStr(ids []string) string {
-	sigs := make([]signature, len(ids))
+func createInputStr(addresses []*ecdsa.PublicKey) string {
+	sigs := make([]signature, len(addresses))
 	inputs := ""
-	for i, id := range ids {
-		sigs[i] = getSig(id)
+	for i, address := range addresses {
+		sigs[i] = getSig(address)
 		inputStr := `
 		{
 			"utxo": {
-				"id": "` + id + `"
+				"address1": "` + address.X.String() + `",
+				"address2": "` + address.Y.String() + `"
 			},
 			"sig1": "` + sigs[i].r.String() + `",
 			"sig2": "` + sigs[i].s.String() + `"
@@ -101,12 +97,23 @@ func createInputStr(ids []string) string {
 	return inputs
 }
 
+var privateKey *ecdsa.PrivateKey
+
 func main() {
 	url := "http://localhost:8080/transaction"
 
-	// Generate input strings
-	utxoIDs := []string{"genesis"}
-	inputs := createInputStr(utxoIDs)
+	// Generate a private key
+	// Need to generate every time you make a transaction
+	var err error
+	privateKey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+
+	// Get a public key (address)
+	publicKey := &privateKey.PublicKey
+	utxos := []*ecdsa.PublicKey{publicKey}
+	inputs := createInputStr(utxos)
 
 	jsonStr := `
 {
@@ -114,14 +121,22 @@ func main() {
 	"outputs": [
 		{
 			"amount": 150,
-			"address": "hogehoge"
+			"address1": "foofoo1",
+			"address2": "foofoo2"
 		},
 		{
 			"amount": 50,
-			"address": "foofoo"
+			"address1": "barbar1",
+			"address2": "barbar2"
 		}
 	]
 }`
+
+	fmt.Println(jsonStr)
+
+	// FIXME: To get addresses to insert them into db as a genesis transaction
+	var dummy string
+	fmt.Scan(&dummy)
 
 	post(url, jsonStr)
 }

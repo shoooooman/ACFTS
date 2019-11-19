@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/x509"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -23,6 +22,7 @@ func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
 	}
 
 	// Convert transaction struct to bytes to get its hash
+	// FIXME: should make a hash of outputs
 	buf := []byte(fmt.Sprintf("%v", transaction))
 
 	// Get hash using SHA256
@@ -41,7 +41,7 @@ func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
 
 func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 	// Convert transaction struct to bytes to get its hash
-	buf := []byte(fmt.Sprintf("%v", utxo.SearchID))
+	buf := []byte(fmt.Sprintf("%v%v", utxo.Address1, utxo.Address2))
 
 	// Get a hash value using SHA256
 	h := crypto.Hash.New(crypto.SHA256)
@@ -49,38 +49,35 @@ func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 	hashed := h.Sum(nil)
 
 	// Convert string to big.Int
-	sigInt1, err := strconv.Atoi(signature1)
-	if err != nil {
+	var ok bool
+	n1 := new(big.Int)
+	n1, ok = n1.SetString(signature1, 10)
+	if !ok {
 		fmt.Println("Signature1 is not valid.")
 		return false
 	}
-	sigBigInt1 := big.NewInt(int64(sigInt1))
 
-	sigInt2, err := strconv.Atoi(signature2)
-	if err != nil {
+	n2 := new(big.Int)
+	n2, ok = n2.SetString(signature2, 10)
+	if !ok {
 		fmt.Println("Signature2 is not valid.")
 		return false
 	}
-	sigBigInt2 := big.NewInt(int64(sigInt2))
 
-	// model.Output.Address represents public key
-	// Convert string to ecdsa.PublicKey
-	x509EncodedPub := []byte(utxo.Address)
-	genericPublicKey, err := x509.ParsePKIXPublicKey(x509EncodedPub)
-	if err != nil {
-		fmt.Println("Address is not valid.")
-		return false
-	}
-	publicKey := genericPublicKey.(*ecdsa.PublicKey)
+	// model.Output.Address1 and Address2 represent public key
+	// Convert Address1 and Address2 to ecdsa.PublicKey
+	address1, _ := new(big.Int).SetString(utxo.Address1, 10)
+	address2, _ := new(big.Int).SetString(utxo.Address2, 10)
+	publicKey := ecdsa.PublicKey{elliptic.P521(), address1, address2}
 
-	if ecdsa.Verify(publicKey, hashed, sigBigInt1, sigBigInt2) {
+	if ecdsa.Verify(&publicKey, hashed, n1, n2) {
 		fmt.Println("Verifyed!")
 		return true
 	}
 	return false
 }
 
-// [tmp] for search_id of outputs
+// [tmp] for incremented number of outputs
 var seq = 1
 
 type inputJSON struct {
@@ -91,9 +88,9 @@ type inputJSON struct {
 
 // Just for responses
 type outputJSON struct {
-	SearchID string `json:"id"`
 	Amount   int    `json:"amount"`
-	Address  string `json:"address"`
+	Address1 string `json:"address1"`
+	Address2 string `json:"address2"`
 	Used     bool   `json:"used"`
 }
 
@@ -106,9 +103,9 @@ type transactionJSON struct {
 // Convert model.Output to outputJSON
 func convertOutput(output model.Output) outputJSON {
 	json := outputJSON{}
-	json.SearchID = output.SearchID
 	json.Amount = output.Amount
-	json.Address = output.Address
+	json.Address1 = output.Address1
+	json.Address2 = output.Address2
 	json.Used = output.Used
 	return json
 }
@@ -144,7 +141,7 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 		for _, input := range inputs {
 			utxo := input.UTXO
 			count := 0
-			db.Where("search_id = ?", utxo.SearchID).First(&utxo).Count(&count)
+			db.Where("address1 = ? AND address2 = ?", utxo.Address1, utxo.Address2).First(&utxo).Count(&count)
 			if count == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"message": "Input is not valid.",
@@ -192,18 +189,22 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 
 		for i, input := range inputs {
 			utxo := input.UTXO
-			db.Model(&utxo).Where("search_id = ?", utxo.SearchID).Update("used", true)
+			db.Model(&utxo).Where("address1 = ? AND address2 = ?", utxo.Address1, utxo.Address2).Update("used", true)
 			// db.Unscoped().Delete(&utxo)
 
-			db.Where("search_id = ?", utxo.SearchID).First(&utxo)
+			db.Where("address1 = ? AND address2 = ?", utxo.Address1, utxo.Address2).First(&utxo)
 			transaction.Inputs[i].UTXO = utxo
 		}
+
+		// FIXME: dummy outputs
+		// Needs to add outputs to requests
 		for i, output := range outputs {
-			output.SearchID = "output" + strconv.Itoa(seq)
+			output.Address1 = "0000" + strconv.Itoa(seq)
+			output.Address2 = "1111" + strconv.Itoa(seq)
 			seq++
 			db.Create(&output)
 
-			db.Where("search_id = ?", output.SearchID).First(&output)
+			db.Where("address1 = ? AND address2 = ?", output.Address1, output.Address2).First(&output)
 			transaction.Outputs[i] = output
 		}
 

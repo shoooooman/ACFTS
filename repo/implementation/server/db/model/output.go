@@ -7,8 +7,8 @@ import (
 // Output represents transaction output
 type Output struct {
 	gorm.Model
-	SearchID string `json:"id"`
 	Amount   int    `json:"amount"`
-	Address  string `json:"address"`
+	Address1 string `json:"address1"`
+	Address2 string `json:"address2"`
 	Used     bool   `json:"used"`
 }
