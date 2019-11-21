@@ -28,6 +28,7 @@ func initDB() *gorm.DB {
 	}
 
 	db.AutoMigrate(&model.Output{})
+	db.AutoMigrate(&model.Signature{})
 
 	return db
 }
@@ -207,7 +208,7 @@ type genesisJSON struct {
 	Genesis model.Output `json:"genesis"`
 }
 
-func createGenesis(owner int, amount int) {
+func createGenesis(urls []string, owner int, amount int) {
 	priKey := keys[owner]
 	pubKey := &priKey.PublicKey
 	genesis := model.Output{
@@ -226,16 +227,16 @@ func createGenesis(owner int, amount int) {
 		"address2": "` + pubKey.Y.String() + `"
 	}`
 
-	// Create a genesis record in a server
-	// FIXME: 複数のサーバーにリクエストを送る
-	url := "http://localhost:8080/genesis"
-	body := post(url, jsonStr)
-	var g genesisJSON
-	err := json.Unmarshal(body, &g)
-	if err != nil {
-		panic(err)
+	// Create genesis records in servers
+	for _, baseURL := range urls {
+		url := baseURL + "/genesis"
+		body := post(url, jsonStr)
+		var g genesisJSON
+		err := json.Unmarshal(body, &g)
+		if err != nil {
+			panic(err)
+		}
 	}
-	fmt.Println(g)
 }
 
 func generateClients(num int) {
@@ -260,7 +261,10 @@ var keys []*ecdsa.PrivateKey
 var pub2Pri map[string]*ecdsa.PrivateKey
 
 func main() {
-	url := "http://localhost:8080/transaction"
+	baseURLs := []string{
+		"http://localhost:8080",
+		"http://localhost:8081",
+	}
 	db = initDB()
 	defer db.Close()
 
@@ -269,14 +273,14 @@ func main() {
 	generateClients(numClients)
 
 	// Make a genesis transaction
-	createGenesis(0, 200)
+	createGenesis(baseURLs, 0, 200)
 
 	// Make sample transactions
 	txs := []simpleTx{
-		// {From: 0, To: []int{1}, Amounts: []int{200}},
-		{From: 0, To: []int{1, 2}, Amounts: []int{150, 50}},
-		{From: 1, To: []int{2}, Amounts: []int{150}},
-		{From: 2, To: []int{0}, Amounts: []int{200}},
+		{From: 0, To: []int{1}, Amounts: []int{200}},
+		// {From: 0, To: []int{1, 2}, Amounts: []int{150, 50}},
+		// {From: 1, To: []int{2}, Amounts: []int{150}},
+		// {From: 2, To: []int{0}, Amounts: []int{200}},
 	}
 
 	for i := 0; i < len(txs); i++ {
@@ -284,18 +288,36 @@ func main() {
 		fmt.Println(jsonStr)
 
 		// FIXME: 全てのサーバーに送るようにし，2/3以上からの応答を待つ
-		body := post(url, jsonStr)
-		response := model.Response{}
-		err := json.Unmarshal(body, &response)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(response)
+		// FIXME: リクエストを送ってレスポンスを受け取る部分は並行処理の方がいい？
+		for j, baseURL := range baseURLs {
+			url := baseURL + "/transaction"
+			body := post(url, jsonStr)
 
-		// Make records of new outputs
-		outputs := response.Transaction.Outputs
-		for _, output := range outputs {
-			db.Create(&output)
+			response := model.Response{}
+			err := json.Unmarshal(body, &response)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(response)
+
+			// Make records of new outputs
+			outputs := response.Transaction.Outputs
+			sigs := model.Signature{
+				Signature1: response.Signature1.String(),
+				Signature2: response.Signature2.String(),
+			}
+			for _, output := range outputs {
+				// Make a record if the output is not created yet
+				if j == 0 {
+					db.Create(&output)
+				}
+				// Add a signature of server i
+				// FIXME: appendがうまくいかない or output_idがインクリメントされてしまう
+				sigs.OutputID = output.ID
+				// db.Model(&output).Association("Signatures").Append(sigs)
+				output.Signatures = append(output.Signatures, sigs)
+				db.Save(&output)
+			}
 		}
 	}
 }

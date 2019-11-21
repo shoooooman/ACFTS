@@ -3,6 +3,8 @@ package main
 import (
 	"acfts/api"
 	"acfts/db/model"
+	"fmt"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
@@ -10,8 +12,8 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
 
-func initDB() *gorm.DB {
-	db, err := gorm.Open("mysql", "root:@tcp(127.0.0.1:3306)/acfts?charset=utf8&parseTime=True&loc=Local")
+func initDB(port int) *gorm.DB {
+	db, err := gorm.Open("mysql", "root:@tcp(127.0.0.1:3306)/acfts_"+strconv.Itoa(port)+"?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
 		panic("failed to connect database")
 	}
@@ -33,9 +35,13 @@ func initRoute(db *gorm.DB) *gin.Engine {
 }
 
 func main() {
-	db := initDB()
+	fmt.Printf("Input port number: ")
+	var port int
+	fmt.Scan(&port)
+
+	db := initDB(port)
 	defer db.Close()
 
 	r := initRoute(db)
-	r.Run()
+	r.Run(":" + strconv.Itoa(port))
 }
