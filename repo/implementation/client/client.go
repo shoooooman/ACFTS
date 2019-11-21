@@ -95,6 +95,8 @@ func createInputStr(utxos []model.Output) string {
 	inputs := ""
 	for i, utxo := range utxos {
 		sigs[i] = getSig(utxo)
+		//  FIXME: 使おうとしているutxoの兄弟のtxもサーバーに送る必要がある
+		// utxoと並列でsiblingsのような要素を入れる
 		inputStr := `
 		{
 			"utxo": {
@@ -145,18 +147,57 @@ var keys []*ecdsa.PrivateKey
 var pub2Pri map[string]*ecdsa.PrivateKey
 
 type simpleTx struct {
-	From    []int
+	// clientの番号(シミュレーション用, 0から)
+	From    int
 	To      []int
 	Amounts []int
 }
 
+func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, bool) {
+	var utxos []model.Output
+	count := 0
+	address1 := publicKey.X.String()
+	address2 := publicKey.Y.String()
+	// TODO: public keyをキーとしてDBからused = false && signatures > 2/3のUTXOを見つける
+	db.Where("address1 = ? AND address2 = ? AND used = false", address1, address2).Find(&utxos).Count(&count)
+	if count == 0 {
+		return nil, false
+	}
+
+	// amount以上になるようにtxを集める
+	sum := 0
+	for i, utxo := range utxos {
+		sum += utxo.Amount
+		db.Model(&utxo).Where("address1 = ? AND address2 = ? AND used = false", address1, address2).Update("used", true)
+		// FIXME: >= ではなく==にする
+		if sum >= amount {
+			utxos = utxos[:i+1]
+			return utxos, true
+		}
+	}
+
+	fmt.Println("There are no enough utxos.")
+	return nil, false
+}
+
 func createJSONStr(tx simpleTx) string {
-	utxos := make([]model.Output, len(tx.From))
-	for i, index := range tx.From {
-		priKey := keys[index]
-		pubKey := &priKey.PublicKey
-		// TODO: 使えるutxoのprevious hashをDBから取ってくる
-		utxos[i] = model.Output{Address1: pubKey.X.String(), Address2: pubKey.Y.String(), PreviousHash: "genesis"}
+	// FIXME: To get addresses to insert them into db as a genesis transaction
+	var dummy string
+	fmt.Scan(&dummy)
+
+	priKey := keys[tx.From]
+	pubKey := &priKey.PublicKey
+	sum := 0
+	for _, val := range tx.Amounts {
+		sum += val
+	}
+	// TODO: 使えるutxoのprevious hashをDBから取ってくる
+	utxos, exists := findUTXOs(pubKey, sum)
+	if !exists {
+		// このclient番号に紐づいている有効なUTXOがなかった場合
+		// トランザクションの作成を保留にすべき？
+		fmt.Printf("There are no valid utxos of client %v\n", tx.From)
+		return ""
 	}
 	inputs := createInputStr(utxos)
 	hash := getPreviousHash(inputs)
@@ -178,9 +219,11 @@ func createJSONStr(tx simpleTx) string {
 	return jsonStr
 }
 
+var db *gorm.DB
+
 func main() {
 	url := "http://localhost:8080/transaction"
-	db := initDB()
+	db = initDB()
 	defer db.Close()
 
 	// Generate private keys
@@ -195,54 +238,31 @@ func main() {
 		}
 		pub := &keys[i].PublicKey
 		pub2Pri[pub.X.String()+pub.Y.String()] = keys[i]
+		fmt.Printf("public key %v\n", i)
+		fmt.Println(pub.X)
+		fmt.Println(pub.Y)
 	}
 
 	// Make transactions
 	txs := []simpleTx{
-		{From: []int{0}, To: []int{1}, Amounts: []int{200}},
-		{From: []int{1}, To: []int{2}, Amounts: []int{200}},
+		{From: 0, To: []int{1}, Amounts: []int{200}},
+		// {From: 0, To: []int{1, 2}, Amounts: []int{150, 60}}, // error
+		// {From: 1, To: []int{2}, Amounts: []int{200}},
 	}
 
 	for i := 0; i < len(txs); i++ {
 		jsonStr := createJSONStr(txs[i])
 		fmt.Println(jsonStr)
 
-		// FIXME: To get addresses to insert them into db as a genesis transaction
-		var dummy string
-		fmt.Scan(&dummy)
-
+		// FIXME: 全てのサーバーに送るようにし，2/3以上からの応答を待つ
 		resp := post(url, jsonStr)
-		// TODO: respのoutputをDBに入れる
+
+		outputs := resp.Transaction.Outputs
+		fmt.Println("outputs")
+		fmt.Println(outputs)
+		for _, output := range outputs {
+			db.Create(&output)
+		}
 		fmt.Println(resp)
 	}
-
-	// 	publicKey := &keys[0].PublicKey
-	// 	utxo1 := model.Output{Address1: publicKey.X.String(), Address2: publicKey.Y.String(), PreviousHash: "genesis"}
-	// 	utxos := []model.Output{utxo1}
-	// 	inputs := createInputStr(utxos)
-	// 	hash := getPreviousHash(inputs)
-	//
-	// 	jsonStr := `
-	// {
-	// 	"inputs": ` + inputs + `,
-	// 	"outputs": [
-	// 		{
-	// 			"amount": 150,
-	// 			"address1": "foofoo1",
-	// 			"address2": "foofoo2",
-	// 			"previous_hash": "` + hash + `"
-	// 		},
-	// 		{
-	// 			"amount": 50,
-	// 			"address1": "barbar1",
-	// 			"address2": "barbar2",
-	// 			"previous_hash": "` + hash + `"
-	// 		}
-	// 	]
-	// }`
-	//
-	// 	fmt.Println(jsonStr)
-
-	// resp := post(url, jsonStr)
-	// fmt.Println(resp)
 }

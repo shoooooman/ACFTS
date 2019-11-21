@@ -135,6 +135,12 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 		c.BindJSON(&transaction)
 
 		inputs := transaction.Inputs
+		if inputs == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "There are no inputs.",
+			})
+			return
+		}
 		inputAmount := 0
 		for _, input := range inputs {
 			utxo := input.UTXO
@@ -169,6 +175,10 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 				})
 				return
 			}
+
+			// TODO: 他のサーバーから集めた署名の検証もする
+			// unlockUTXOはclient自身の署名の検証で別物
+
 			inputAmount += utxo.Amount
 		}
 
@@ -187,10 +197,10 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 
 		for i, input := range inputs {
 			utxo := input.UTXO
-			db.Model(&utxo).Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).Update("used", true)
+			// db.Model(&utxo).Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).Update("used", true)
 			// db.Unscoped().Delete(&utxo)
 
-			db.Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).First(&utxo)
+			db.Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).First(&utxo).Update("used", true)
 			transaction.Inputs[i].UTXO = utxo
 		}
 

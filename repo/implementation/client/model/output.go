@@ -10,4 +10,6 @@ type Output struct {
 	Address2     string `json:"address2"`
 	PreviousHash string `json:"previous_hash"`
 	Used         bool   `json:"used"`
+	// Signatures   []string
+	// FIXME: 別テーブルにsignatureは保存してoutputsにはそのidを置いておく
 }
