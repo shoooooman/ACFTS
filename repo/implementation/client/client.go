@@ -85,10 +85,9 @@ func getSig(utxo model.Output) signature {
 }
 
 func createInputStr(utxos []model.Output) string {
-	sigs := make([]signature, len(utxos))
 	inputs := ""
-	for i, utxo := range utxos {
-		sigs[i] = getSig(utxo)
+	for _, utxo := range utxos {
+		sig := getSig(utxo)
 		//  FIXME: 使おうとしているutxoの兄弟のtxもサーバーに送る必要がある
 		// utxoと並列でsiblingsのような要素を入れる
 		inputStr := `
@@ -98,8 +97,8 @@ func createInputStr(utxos []model.Output) string {
 				"address2": "` + utxo.Address2 + `",
 				"previous_hash": "` + utxo.PreviousHash + `"
 			},
-			"sig1": "` + sigs[i].r.String() + `",
-			"sig2": "` + sigs[i].s.String() + `"
+			"sig1": "` + sig.r.String() + `",
+			"sig2": "` + sig.s.String() + `"
 		},`
 
 		inputs += inputStr
