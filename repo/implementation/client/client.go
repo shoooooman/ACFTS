@@ -32,7 +32,7 @@ func initDB() *gorm.DB {
 	return db
 }
 
-func post(url, jsonStr string) model.Response {
+func post(url, jsonStr string) []byte {
 	req, err := http.NewRequest(
 		"POST",
 		url,
@@ -56,13 +56,7 @@ func post(url, jsonStr string) model.Response {
 		panic(err)
 	}
 
-	response := model.Response{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		panic(err)
-	}
-
-	return response
+	return body
 }
 
 type signature struct {
@@ -141,11 +135,6 @@ func getPreviousHash(previous string) string {
 	return string(num)
 }
 
-var keys []*ecdsa.PrivateKey
-
-// Get a private key from a public key (PublicKey.X + PublicKey.Y)
-var pub2Pri map[string]*ecdsa.PrivateKey
-
 type simpleTx struct {
 	// clientの番号(シミュレーション用, 0から)
 	From    int
@@ -181,20 +170,15 @@ func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, bool) {
 }
 
 func createJSONStr(tx simpleTx) string {
-	// FIXME: To get addresses to insert them into db as a genesis transaction
-	var dummy string
-	fmt.Scan(&dummy)
-
 	priKey := keys[tx.From]
 	pubKey := &priKey.PublicKey
 	sum := 0
 	for _, val := range tx.Amounts {
 		sum += val
 	}
-	// TODO: 使えるutxoのprevious hashをDBから取ってくる
 	utxos, exists := findUTXOs(pubKey, sum)
 	if !exists {
-		// このclient番号に紐づいている有効なUTXOがなかった場合
+		// TODO: このclient番号に紐づいている有効なUTXOがなかった場合
 		// トランザクションの作成を保留にすべき？
 		fmt.Printf("There are no valid utxos of client %v\n", tx.From)
 		return ""
@@ -219,7 +203,62 @@ func createJSONStr(tx simpleTx) string {
 	return jsonStr
 }
 
+type genesisJSON struct {
+	Message string       `json:"message"`
+	Genesis model.Output `json:"genesis"`
+}
+
+func createGenesis(owner int, amount int) {
+	priKey := keys[owner]
+	pubKey := &priKey.PublicKey
+	genesis := model.Output{
+		Amount:       amount,
+		Address1:     pubKey.X.String(),
+		Address2:     pubKey.Y.String(),
+		PreviousHash: "genesis",
+		Used:         false,
+	}
+	db.Create(&genesis)
+
+	jsonStr := `
+	{
+		"amount": ` + strconv.Itoa(amount) + `,
+		"address1": "` + pubKey.X.String() + `",
+		"address2": "` + pubKey.Y.String() + `"
+	}`
+
+	// Create a genesis record in a server
+	// FIXME: 複数のサーバーにリクエストを送る
+	url := "http://localhost:8080/genesis"
+	body := post(url, jsonStr)
+	var g genesisJSON
+	err := json.Unmarshal(body, &g)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(g)
+}
+
+func generateClients(num int) {
+	keys = make([]*ecdsa.PrivateKey, num)
+	pub2Pri = make(map[string]*ecdsa.PrivateKey)
+	for i := 0; i < num; i++ {
+		var err error
+		keys[i], err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		if err != nil {
+			panic(err)
+		}
+		pub := &keys[i].PublicKey
+		pub2Pri[pub.X.String()+pub.Y.String()] = keys[i]
+	}
+}
+
 var db *gorm.DB
+
+var keys []*ecdsa.PrivateKey
+
+// Get a private key from a public key (PublicKey.X + PublicKey.Y)
+var pub2Pri map[string]*ecdsa.PrivateKey
 
 func main() {
 	url := "http://localhost:8080/transaction"
@@ -228,26 +267,17 @@ func main() {
 
 	// Generate private keys
 	const numClients = 3
-	keys = make([]*ecdsa.PrivateKey, numClients)
-	pub2Pri = make(map[string]*ecdsa.PrivateKey)
-	for i := 0; i < numClients; i++ {
-		var err error
-		keys[i], err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-		if err != nil {
-			panic(err)
-		}
-		pub := &keys[i].PublicKey
-		pub2Pri[pub.X.String()+pub.Y.String()] = keys[i]
-		fmt.Printf("public key %v\n", i)
-		fmt.Println(pub.X)
-		fmt.Println(pub.Y)
-	}
+	generateClients(numClients)
 
-	// Make transactions
+	// Make a genesis transaction
+	createGenesis(0, 200)
+
+	// Make sample transactions
 	txs := []simpleTx{
-		{From: 0, To: []int{1}, Amounts: []int{200}},
-		// {From: 0, To: []int{1, 2}, Amounts: []int{150, 60}}, // error
-		// {From: 1, To: []int{2}, Amounts: []int{200}},
+		// {From: 0, To: []int{1}, Amounts: []int{200}},
+		{From: 0, To: []int{1, 2}, Amounts: []int{150, 50}},
+		{From: 1, To: []int{2}, Amounts: []int{150}},
+		{From: 2, To: []int{0}, Amounts: []int{200}},
 	}
 
 	for i := 0; i < len(txs); i++ {
@@ -255,14 +285,18 @@ func main() {
 		fmt.Println(jsonStr)
 
 		// FIXME: 全てのサーバーに送るようにし，2/3以上からの応答を待つ
-		resp := post(url, jsonStr)
+		body := post(url, jsonStr)
+		response := model.Response{}
+		err := json.Unmarshal(body, &response)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(response)
 
-		outputs := resp.Transaction.Outputs
-		fmt.Println("outputs")
-		fmt.Println(outputs)
+		// Make records of new outputs
+		outputs := response.Transaction.Outputs
 		for _, output := range outputs {
 			db.Create(&output)
 		}
-		fmt.Println(resp)
 	}
 }

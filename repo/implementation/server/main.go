@@ -26,6 +26,7 @@ func initRoute(db *gorm.DB) *gin.Engine {
 
 	// APIs
 	r.GET("/", api.Ping())
+	r.POST("/genesis", api.CreateGenesis(db))
 	r.POST("/transaction", api.VerifyTransaction(db))
 
 	return r

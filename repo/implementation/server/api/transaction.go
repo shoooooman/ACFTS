@@ -76,6 +76,7 @@ func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 	return false
 }
 
+// Just for responses
 type inputJSON struct {
 	UTXO       outputJSON `json:"utxo"`
 	Signature1 string     `json:"sig1"`
@@ -141,6 +142,15 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 			})
 			return
 		}
+
+		outputs := transaction.Outputs
+		if outputs == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "There are no outputs.",
+			})
+			return
+		}
+
 		inputAmount := 0
 		for _, input := range inputs {
 			utxo := input.UTXO
@@ -182,7 +192,6 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 			inputAmount += utxo.Amount
 		}
 
-		outputs := transaction.Outputs
 		outputAmount := 0
 		for _, output := range outputs {
 			outputAmount += output.Amount
