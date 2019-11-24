@@ -11,5 +11,4 @@ type Output struct {
 	PreviousHash string      `json:"previous_hash"`
 	Used         bool        `json:"used"`
 	Signatures   []Signature `gorm:"foreignkey:OutputID"`
-	// FIXME: 別テーブルにsignatureは保存してoutputsにはそのidを置いておく
 }

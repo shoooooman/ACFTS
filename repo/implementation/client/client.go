@@ -300,7 +300,6 @@ func main() {
 			}
 			fmt.Println(response)
 
-			// Make records of new outputs
 			outputs := response.Transaction.Outputs
 			sigs := model.Signature{
 				Signature1: response.Signature1.String(),
@@ -310,13 +309,15 @@ func main() {
 				// Make a record if the output is not created yet
 				if j == 0 {
 					db.Create(&output)
+					fmt.Printf("Created in %d\n", j)
+				} else {
+					db.Where("address1 = ? AND address2 = ? AND previous_hash = ?",
+						output.Address1, output.Address2, output.PreviousHash).
+						First(&output)
 				}
 				// Add a signature of server i
-				// FIXME: appendがうまくいかない or output_idがインクリメントされてしまう
 				sigs.OutputID = output.ID
-				// db.Model(&output).Association("Signatures").Append(sigs)
-				output.Signatures = append(output.Signatures, sigs)
-				db.Save(&output)
+				db.Model(&output).Association("Signatures").Append(sigs)
 			}
 		}
 	}
