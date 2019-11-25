@@ -135,25 +135,35 @@ func getPreviousHash(previous string) string {
 	return string(num)
 }
 
+// From, To: Number of clients
 type simpleTx struct {
-	// clientの番号(シミュレーション用, 0から)
 	From    int
 	To      []int
 	Amounts []int
 }
 
 func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, bool) {
-	var utxos []model.Output
-	count := 0
+	var candidates []model.Output
 	address1 := publicKey.X.String()
 	address2 := publicKey.Y.String()
-	// TODO: public keyをキーとしてDBからused = false && signatures > 2/3のUTXOを見つける
-	db.Where("address1 = ? AND address2 = ? AND used = false", address1, address2).Find(&utxos).Count(&count)
-	if count == 0 {
+	// TODO: signatures > 2/3のUTXOをSQLで見つける
+	db.Where("address1 = ? AND address2 = ? AND used = false", address1, address2).
+		Find(&candidates)
+
+	// Select outputs which have enough signatures
+	utxos := make([]model.Output, 0)
+	for _, candidate := range candidates {
+		count := 0
+		db.Table("signatures").Where("output_id= ?", candidate.ID).Count(&count)
+		if float64(count) >= 2.0*N/3.0 {
+			utxos = append(utxos, candidate)
+		}
+	}
+	if len(utxos) == 0 {
 		return nil, false
 	}
 
-	// amount以上になるようにtxを集める
+	// Collect transactions so that the amount of them becomes equal to the arguement
 	sum := 0
 	for i, utxo := range utxos {
 		sum += utxo.Amount
@@ -211,12 +221,17 @@ type genesisJSON struct {
 func createGenesis(urls []string, owner int, amount int) {
 	priKey := keys[owner]
 	pubKey := &priKey.PublicKey
+	sigs := []model.Signature{
+		{Signature1: "gene", Signature2: "sis1", OutputID: 1},
+		{Signature1: "gene", Signature2: "sis2", OutputID: 1},
+	}
 	genesis := model.Output{
 		Amount:       amount,
 		Address1:     pubKey.X.String(),
 		Address2:     pubKey.Y.String(),
 		PreviousHash: "genesis",
 		Used:         false,
+		Signatures:   sigs,
 	}
 	db.Create(&genesis)
 
@@ -259,6 +274,9 @@ var keys []*ecdsa.PrivateKey
 
 // Get a private key from a public key (PublicKey.X + PublicKey.Y)
 var pub2Pri map[string]*ecdsa.PrivateKey
+
+// N is number of servers
+const N = 2
 
 func main() {
 	baseURLs := []string{
@@ -309,7 +327,6 @@ func main() {
 				// Make a record if the output is not created yet
 				if j == 0 {
 					db.Create(&output)
-					fmt.Printf("Created in %d\n", j)
 				} else {
 					db.Where("address1 = ? AND address2 = ? AND previous_hash = ?",
 						output.Address1, output.Address2, output.PreviousHash).

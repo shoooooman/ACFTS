@@ -63,7 +63,7 @@ func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 		return false
 	}
 
-	// model.Output.Address1 and Address2 represent public key
+	// model.Output.Address1 and Address2 represent a public key
 	// Convert Address1 and Address2 to ecdsa.PublicKey
 	address1, _ := new(big.Int).SetString(utxo.Address1, 10)
 	address2, _ := new(big.Int).SetString(utxo.Address2, 10)
