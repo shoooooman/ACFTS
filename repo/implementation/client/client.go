@@ -319,39 +319,7 @@ func generateClients(num int) {
 	}
 }
 
-var db *gorm.DB
-
-var keys []*ecdsa.PrivateKey
-
-// Get a private key from a public key (PublicKey.X + PublicKey.Y)
-var pub2Pri map[string]*ecdsa.PrivateKey
-
-// N is number of servers
-const N = 2
-
-func main() {
-	baseURLs := []string{
-		"http://localhost:8080",
-		"http://localhost:8081",
-	}
-	db = initDB()
-	defer db.Close()
-
-	// Generate private keys
-	const numClients = 3
-	generateClients(numClients)
-
-	// Make a genesis transaction
-	createGenesis(baseURLs, 0, 200)
-
-	// Make sample transactions
-	txs := []simpleTx{
-		{From: 0, To: []int{1}, Amounts: []int{200}},
-		// {From: 0, To: []int{1, 2}, Amounts: []int{150, 50}},
-		// {From: 1, To: []int{2}, Amounts: []int{150}},
-		// {From: 2, To: []int{0}, Amounts: []int{200}},
-	}
-
+func executeTxs(baseURLs []string, txs []simpleTx, finished chan bool, p bool) {
 	for i := 0; i < len(txs); i++ {
 		jsonStr := createJSONStr(txs[i])
 		fmt.Println(jsonStr)
@@ -391,4 +359,64 @@ func main() {
 			}
 		}
 	}
+	if p {
+		finished <- true
+	}
+}
+
+var db *gorm.DB
+
+var keys []*ecdsa.PrivateKey
+
+// Get a private key from a public key (PublicKey.X + PublicKey.Y)
+var pub2Pri map[string]*ecdsa.PrivateKey
+
+// N is number of servers
+const N = 2
+
+func main() {
+	baseURLs := []string{
+		"http://localhost:8080",
+		"http://localhost:8081",
+	}
+	db = initDB()
+	defer db.Close()
+
+	// Generate private keys
+	const numClients = 4
+	generateClients(numClients)
+
+	// Make a genesis transaction
+	createGenesis(baseURLs, 0, 200)
+
+	// Make sample transactions
+	finished := make(chan bool)
+
+	tx0 := simpleTx{From: 0, To: []int{0, 2}, Amounts: []int{100, 100}}
+	txs0 := []simpleTx{}
+	txs0 = append(txs0, tx0)
+	executeTxs(baseURLs, txs0, finished, false)
+
+	tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{100}}
+	tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{100}}
+	tx3 := simpleTx{From: 2, To: []int{3}, Amounts: []int{100}}
+	tx4 := simpleTx{From: 3, To: []int{2}, Amounts: []int{100}}
+	txs1 := []simpleTx{
+		// {From: 0, To: []int{1}, Amounts: []int{200}},
+		// {From: 0, To: []int{1, 2}, Amounts: []int{150, 50}},
+		// {From: 1, To: []int{2}, Amounts: []int{150}},
+		// {From: 2, To: []int{0}, Amounts: []int{200}},
+	}
+	txs2 := []simpleTx{}
+	for i := 0; i < 5; i++ {
+		txs1 = append(txs1, tx1)
+		txs1 = append(txs1, tx2)
+		txs2 = append(txs2, tx3)
+		txs2 = append(txs2, tx4)
+	}
+
+	go executeTxs(baseURLs, txs1, finished, true)
+	go executeTxs(baseURLs, txs2, finished, true)
+	<-finished
+	<-finished
 }

@@ -16,8 +16,15 @@ import (
 
 func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
 	// TODO: Outputsのgorm.Modelは時刻が厄介なので抜いたほうがいいかもしれない
+	// outputJSONを代わりに使う
+	simpleOutputs := make([]outputJSON, len(transaction.Outputs))
+	for i := range simpleOutputs {
+		simpleOutputs[i] = convertOutput(transaction.Outputs[i])
+	}
+
 	// Convert transaction.Outputs to bytes to get its hash
-	buf := []byte(fmt.Sprintf("%v", transaction.Outputs))
+	// buf := []byte(fmt.Sprintf("%v", transaction.Outputs))
+	buf := []byte(fmt.Sprintf("%v", simpleOutputs))
 	fmt.Println("outputs when creating")
 	fmt.Println(transaction.Outputs)
 
@@ -80,13 +87,13 @@ func verifyUTXO(utxo model.Output, siblings []model.Output) bool {
 	signatures := utxo.Signatures
 
 	// Create the same array as when creating a signature
-	outputs := make([]model.Output, 1+len(siblings))
+	outputs := make([]outputJSON, 1+len(siblings))
 	for i := range outputs {
 		if i < int(utxo.Index) {
-			outputs[i] = siblings[i]
+			outputs[i] = convertOutput(siblings[i])
 			outputs[i].Used = false // FIXME
 		} else if i > int(utxo.Index) {
-			outputs[i] = siblings[i-1]
+			outputs[i] = convertOutput(siblings[i-1])
 			outputs[i].Used = false // FIXME
 		} else {
 			// utxoWithoutSigs := model.Output{
@@ -100,7 +107,7 @@ func verifyUTXO(utxo model.Output, siblings []model.Output) bool {
 			// outputs[i] = utxoWithoutSigs
 			utxo.Used = false                            // FIXME
 			utxo.Signatures = make([]model.Signature, 0) // FIXME
-			outputs[i] = utxo
+			outputs[i] = convertOutput(utxo)
 		}
 	}
 
