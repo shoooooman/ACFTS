@@ -15,22 +15,22 @@ import (
 )
 
 func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-	if err != nil {
-		panic(err)
-	}
-
-	// Convert transaction struct to bytes to get its hash
-	// FIXME: should make a hash of outputs
-	buf := []byte(fmt.Sprintf("%v", transaction))
+	// TODO: Outputsのgorm.Modelは時刻が厄介なので抜いたほうがいいかもしれない
+	// Convert transaction.Outputs to bytes to get its hash
+	buf := []byte(fmt.Sprintf("%v", transaction.Outputs))
+	fmt.Println("outputs when creating")
+	fmt.Println(transaction.Outputs)
 
 	// Get hash using SHA256
 	h := crypto.Hash.New(crypto.SHA256)
 	h.Write(buf)
 	hashed := h.Sum(nil)
 
+	fmt.Println("hash when creating")
+	fmt.Println(hashed)
+
 	// Get signature using ellipse curve cryptography
-	r, s, err := ecdsa.Sign(rand.Reader, privateKey, hashed)
+	r, s, err := ecdsa.Sign(rand.Reader, key, hashed)
 	if err != nil {
 		panic(err)
 	}
@@ -76,11 +76,79 @@ func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 	return false
 }
 
+func verifyUTXO(utxo model.Output, siblings []model.Output) bool {
+	signatures := utxo.Signatures
+
+	// Create the same array as when creating a signature
+	outputs := make([]model.Output, 1+len(siblings))
+	for i := range outputs {
+		if i < int(utxo.Index) {
+			outputs[i] = siblings[i]
+			outputs[i].Used = false // FIXME
+		} else if i > int(utxo.Index) {
+			outputs[i] = siblings[i-1]
+			outputs[i].Used = false // FIXME
+		} else {
+			// utxoWithoutSigs := model.Output{
+			// 	gorm.Model:   utxo.gorm.Model,
+			// 	Amount:       utxo.Amount,
+			// 	Address1:     utxo.Address1,
+			// 	Address2:     utxo.Address2,
+			// 	PreviousHash: utxo.PreviousHash,
+			// 	Index:        utxo.Index,
+			// }
+			// outputs[i] = utxoWithoutSigs
+			utxo.Used = false                            // FIXME
+			utxo.Signatures = make([]model.Signature, 0) // FIXME
+			outputs[i] = utxo
+		}
+	}
+
+	// Convert transaction struct to bytes to get its hash
+	buf := []byte(fmt.Sprintf("%v", outputs))
+	fmt.Println("outputs when verification")
+	fmt.Println(outputs)
+
+	// Get a hash value using SHA256
+	h := crypto.Hash.New(crypto.SHA256)
+	h.Write(buf)
+	hashed := h.Sum(nil)
+
+	fmt.Println("hash when verification")
+	fmt.Println(hashed)
+
+	// Genesis is approved without verification
+	if utxo.PreviousHash == "genesis" {
+		return true
+	}
+
+	valid := 0
+	for _, signature := range signatures {
+		// FIXME: Should get public keys of other servers independently of clients
+		address1, _ := new(big.Int).SetString(signature.Address1, 10)
+		address2, _ := new(big.Int).SetString(signature.Address2, 10)
+		serverPubKey := ecdsa.PublicKey{elliptic.P521(), address1, address2}
+		signature1, _ := new(big.Int).SetString(signature.Signature1, 10)
+		signature2, _ := new(big.Int).SetString(signature.Signature2, 10)
+		if ecdsa.Verify(&serverPubKey, hashed, signature1, signature2) {
+			valid++
+			fmt.Println("one valid signature")
+			if float64(valid) >= 2.0*N/3.0 {
+				fmt.Println("Server Verifyed!")
+				return true
+			}
+		} else {
+			fmt.Println("not valid")
+		}
+	}
+	return false
+}
+
 // Just for responses
 type inputJSON struct {
 	UTXO       outputJSON `json:"utxo"`
-	Signature1 string     `json:"sig1"`
-	Signature2 string     `json:"sig2"`
+	Signature1 string     `json:"signature1"`
+	Signature2 string     `json:"signature2"`
 }
 
 // Just for responses
@@ -89,6 +157,7 @@ type outputJSON struct {
 	Address1     string `json:"address1"`
 	Address2     string `json:"address2"`
 	PreviousHash string `json:"previous_hash"`
+	Index        uint   `json:"index"`
 	Used         bool   `json:"used"`
 }
 
@@ -105,6 +174,7 @@ func convertOutput(output model.Output) outputJSON {
 	json.Address1 = output.Address1
 	json.Address2 = output.Address2
 	json.PreviousHash = output.PreviousHash
+	json.Index = output.Index
 	json.Used = output.Used
 	return json
 }
@@ -186,8 +256,14 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 				return
 			}
 
-			// TODO: 他のサーバーから集めた署名の検証もする
-			// unlockUTXOはclient自身の署名の検証で別物
+			// Update gorm.Model of Siblings
+			db.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).Find(&input.Siblings)
+			if !verifyUTXO(utxo, input.Siblings) {
+				c.JSON(http.StatusOK, gin.H{
+					"message": "UTXO does not have enough signatures.",
+				})
+				return
+			}
 
 			inputAmount += utxo.Amount
 		}
@@ -226,6 +302,8 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{
 			"message":     "Verified this transaction.",
 			"transaction": json,
+			"address1":    (&key.PublicKey).X.String(),
+			"address2":    (&key.PublicKey).Y.String(),
 			"signature1":  r,
 			"signature2":  s,
 		})

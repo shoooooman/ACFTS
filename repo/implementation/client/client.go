@@ -65,7 +65,7 @@ type signature struct {
 	s *big.Int
 }
 
-func getSig(utxo model.Output) signature {
+func getClientSig(utxo model.Output) signature {
 	// Convert addresses to bytes to get its hash
 	buf := []byte(fmt.Sprintf("%v%v%v", utxo.Address1, utxo.Address2, utxo.PreviousHash))
 
@@ -85,21 +85,70 @@ func getSig(utxo model.Output) signature {
 	return sig
 }
 
+func getServerSigs(utxo model.Output) string {
+	var signatures []model.Signature
+	db.Table("signatures").Where("output_id = ?", utxo.ID).Find(&signatures)
+
+	str := ""
+	for _, signature := range signatures {
+		s := `
+					{
+						"address1": "` + signature.Address1 + `",
+						"address2": "` + signature.Address2 + `",
+						"signature1": "` + signature.Signature1 + `",
+						"signature2": "` + signature.Signature2 + `"
+					},`
+		str += s
+	}
+	// Remove the last ','
+	str = "[" + str[:len(str)-1] + "]"
+
+	return str
+}
+
+func getSiblings(utxo model.Output) string {
+	var siblings []model.Output
+	db.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).Find(&siblings)
+
+	str := ""
+	for _, sibling := range siblings {
+		// usedとsiblingsは初期値(サーバー側で署名される時の値が初期値だから)
+		s := `
+				{
+					"amount": ` + strconv.Itoa(sibling.Amount) + `,
+					"address1": "` + sibling.Address1 + `",
+					"address2": "` + sibling.Address2 + `",
+					"previous_hash": "` + sibling.PreviousHash + `",
+					"used": false,
+					"signatures": []
+				},`
+		str += s
+	}
+	// Remove the last ','
+	if len(str) > 0 {
+		str = "[" + str[:len(str)-1] + "]"
+	} else {
+		str = "[]"
+	}
+
+	return str
+}
+
 func createInputStr(utxos []model.Output) string {
 	inputs := ""
 	for _, utxo := range utxos {
-		sig := getSig(utxo)
-		//  FIXME: 使おうとしているutxoの兄弟のtxもサーバーに送る必要がある
-		// utxoと並列でsiblingsのような要素を入れる
+		sig := getClientSig(utxo)
 		inputStr := `
 		{
 			"utxo": {
 				"address1": "` + utxo.Address1 + `",
 				"address2": "` + utxo.Address2 + `",
-				"previous_hash": "` + utxo.PreviousHash + `"
+				"previous_hash": "` + utxo.PreviousHash + `",
+				"server_signatures": ` + getServerSigs(utxo) + `
 			},
-			"sig1": "` + sig.r.String() + `",
-			"sig2": "` + sig.s.String() + `"
+			"siblings": ` + getSiblings(utxo) + `,
+			"signature1": "` + sig.r.String() + `",
+			"signature2": "` + sig.s.String() + `"
 		},`
 
 		inputs += inputStr
@@ -112,13 +161,14 @@ func createInputStr(utxos []model.Output) string {
 
 func createOutputStr(ops []model.Output, hash string) string {
 	outputs := ""
-	for _, op := range ops {
+	for i, op := range ops {
 		outputStr := `
 		{
 			"amount": ` + strconv.Itoa(op.Amount) + `,
 			"address1": "` + op.Address1 + `",
 			"address2": "` + op.Address2 + `",
-			"previous_hash": "` + hash + `"
+			"previous_hash": "` + hash + `",
+			"index": ` + strconv.Itoa(i) + `
 		},`
 
 		outputs += outputStr
@@ -154,7 +204,7 @@ func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, bool) {
 	utxos := make([]model.Output, 0)
 	for _, candidate := range candidates {
 		count := 0
-		db.Table("signatures").Where("output_id= ?", candidate.ID).Count(&count)
+		db.Table("signatures").Where("output_id = ?", candidate.ID).Count(&count)
 		if float64(count) >= 2.0*N/3.0 {
 			utxos = append(utxos, candidate)
 		}
@@ -222,14 +272,15 @@ func createGenesis(urls []string, owner int, amount int) {
 	priKey := keys[owner]
 	pubKey := &priKey.PublicKey
 	sigs := []model.Signature{
-		{Signature1: "gene", Signature2: "sis1", OutputID: 1},
-		{Signature1: "gene", Signature2: "sis2", OutputID: 1},
+		{Address1: "dum", Address2: "my1", Signature1: "gene", Signature2: "sis1", OutputID: 1},
+		{Address1: "dum", Address2: "my2", Signature1: "gene", Signature2: "sis2", OutputID: 1},
 	}
 	genesis := model.Output{
 		Amount:       amount,
 		Address1:     pubKey.X.String(),
 		Address2:     pubKey.Y.String(),
 		PreviousHash: "genesis",
+		Index:        0,
 		Used:         false,
 		Signatures:   sigs,
 	}
@@ -320,6 +371,8 @@ func main() {
 
 			outputs := response.Transaction.Outputs
 			sigs := model.Signature{
+				Address1:   response.Address1,
+				Address2:   response.Address2,
 				Signature1: response.Signature1.String(),
 				Signature2: response.Signature2.String(),
 			}
