@@ -274,6 +274,8 @@ func createGenesis(urls []string, owner int, amount int) {
 	sigs := []model.Signature{
 		{Address1: "dum", Address2: "my1", Signature1: "gene", Signature2: "sis1", OutputID: 1},
 		{Address1: "dum", Address2: "my2", Signature1: "gene", Signature2: "sis2", OutputID: 1},
+		{Address1: "dum", Address2: "my3", Signature1: "gene", Signature2: "sis3", OutputID: 1},
+		{Address1: "dum", Address2: "my4", Signature1: "gene", Signature2: "sis4", OutputID: 1},
 	}
 	genesis := model.Output{
 		Amount:       amount,
@@ -372,12 +374,14 @@ var keys []*ecdsa.PrivateKey
 var pub2Pri map[string]*ecdsa.PrivateKey
 
 // N is number of servers
-const N = 2
+const N = 4
 
 func main() {
 	baseURLs := []string{
 		"http://localhost:8080",
 		"http://localhost:8081",
+		"http://localhost:8082",
+		"http://localhost:8083",
 	}
 	db = initDB()
 	defer db.Close()
@@ -400,7 +404,7 @@ func main() {
 	// tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{200}}
 	// tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{200}}
 	// txs1 := []simpleTx{}
-	// for i := 0; i < 25; i++ {
+	// for i := 0; i < 10; i++ {
 	// 	txs1 = append(txs1, tx1)
 	// 	txs1 = append(txs1, tx2)
 	// }
@@ -420,7 +424,7 @@ func main() {
 	// tx4 := simpleTx{From: 3, To: []int{2}, Amounts: []int{150}}
 	// txs1 := []simpleTx{}
 	// txs2 := []simpleTx{}
-	// for i := 0; i < 25; i++ {
+	// for i := 0; i < 10; i++ {
 	// 	txs1 = append(txs1, tx1)
 	// 	txs1 = append(txs1, tx2)
 	// 	txs2 = append(txs2, tx3)

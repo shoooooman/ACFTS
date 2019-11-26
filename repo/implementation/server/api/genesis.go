@@ -12,7 +12,7 @@ import (
 )
 
 // N is number of servers
-const N = 2
+const N = 4
 
 // key is a private key of this server
 var key *ecdsa.PrivateKey
