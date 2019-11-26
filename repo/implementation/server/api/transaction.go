@@ -15,18 +15,14 @@ import (
 )
 
 func createSignature(transaction model.Transaction) (*big.Int, *big.Int) {
-	// TODO: Outputsのgorm.Modelは時刻が厄介なので抜いたほうがいいかもしれない
-	// outputJSONを代わりに使う
-	simpleOutputs := make([]outputJSON, len(transaction.Outputs))
+	// Remove gorm.Model, Used, Signatures from outputs
+	simpleOutputs := make([]simpleOutput, len(transaction.Outputs))
 	for i := range simpleOutputs {
 		simpleOutputs[i] = convertOutput(transaction.Outputs[i])
 	}
 
-	// Convert transaction.Outputs to bytes to get its hash
-	// buf := []byte(fmt.Sprintf("%v", transaction.Outputs))
+	// Convert []simpleOutput to bytes to get its hash
 	buf := []byte(fmt.Sprintf("%v", simpleOutputs))
-	fmt.Println("outputs when creating")
-	fmt.Println(transaction.Outputs)
 
 	// Get hash using SHA256
 	h := crypto.Hash.New(crypto.SHA256)
@@ -84,37 +80,26 @@ func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 }
 
 func verifyUTXO(utxo model.Output, siblings []model.Output) bool {
-	signatures := utxo.Signatures
+	// Genesis is approved without verification
+	if utxo.PreviousHash == "genesis" {
+		fmt.Println("genesis is approved without verification.")
+		return true
+	}
 
 	// Create the same array as when creating a signature
-	outputs := make([]outputJSON, 1+len(siblings))
+	outputs := make([]simpleOutput, 1+len(siblings))
 	for i := range outputs {
 		if i < int(utxo.Index) {
 			outputs[i] = convertOutput(siblings[i])
-			outputs[i].Used = false // FIXME
 		} else if i > int(utxo.Index) {
 			outputs[i] = convertOutput(siblings[i-1])
-			outputs[i].Used = false // FIXME
 		} else {
-			// utxoWithoutSigs := model.Output{
-			// 	gorm.Model:   utxo.gorm.Model,
-			// 	Amount:       utxo.Amount,
-			// 	Address1:     utxo.Address1,
-			// 	Address2:     utxo.Address2,
-			// 	PreviousHash: utxo.PreviousHash,
-			// 	Index:        utxo.Index,
-			// }
-			// outputs[i] = utxoWithoutSigs
-			utxo.Used = false                            // FIXME
-			utxo.Signatures = make([]model.Signature, 0) // FIXME
 			outputs[i] = convertOutput(utxo)
 		}
 	}
 
 	// Convert transaction struct to bytes to get its hash
 	buf := []byte(fmt.Sprintf("%v", outputs))
-	fmt.Println("outputs when verification")
-	fmt.Println(outputs)
 
 	// Get a hash value using SHA256
 	h := crypto.Hash.New(crypto.SHA256)
@@ -124,13 +109,8 @@ func verifyUTXO(utxo model.Output, siblings []model.Output) bool {
 	fmt.Println("hash when verification")
 	fmt.Println(hashed)
 
-	// Genesis is approved without verification
-	if utxo.PreviousHash == "genesis" {
-		return true
-	}
-
 	valid := 0
-	for _, signature := range signatures {
+	for _, signature := range utxo.Signatures {
 		// FIXME: Should get public keys of other servers independently of clients
 		address1, _ := new(big.Int).SetString(signature.Address1, 10)
 		address2, _ := new(big.Int).SetString(signature.Address2, 10)
@@ -151,46 +131,44 @@ func verifyUTXO(utxo model.Output, siblings []model.Output) bool {
 	return false
 }
 
-// Just for responses
-type inputJSON struct {
-	UTXO       outputJSON `json:"utxo"`
-	Signature1 string     `json:"signature1"`
-	Signature2 string     `json:"signature2"`
+// Remove unnecessary properties from model.Input
+type simpleInput struct {
+	UTXO       simpleOutput `json:"utxo"`
+	Signature1 string       `json:"signature1"`
+	Signature2 string       `json:"signature2"`
 }
 
-// Just for responses
-type outputJSON struct {
+// Remove unnecessary properties from model.Input
+type simpleOutput struct {
 	Amount       int    `json:"amount"`
 	Address1     string `json:"address1"`
 	Address2     string `json:"address2"`
 	PreviousHash string `json:"previous_hash"`
 	Index        uint   `json:"index"`
-	Used         bool   `json:"used"`
 }
 
-// Just for responses
-type transactionJSON struct {
-	Inputs  []inputJSON  `json:"inputs"`
-	Outputs []outputJSON `json:"outputs"`
+// Remove unnecessary properties from model.Input
+type simpleTransaction struct {
+	Inputs  []simpleInput  `json:"inputs"`
+	Outputs []simpleOutput `json:"outputs"`
 }
 
-// Convert model.Output to outputJSON
-func convertOutput(output model.Output) outputJSON {
-	json := outputJSON{}
+// Convert model.Output to simpleOutput
+func convertOutput(output model.Output) simpleOutput {
+	json := simpleOutput{}
 	json.Amount = output.Amount
 	json.Address1 = output.Address1
 	json.Address2 = output.Address2
 	json.PreviousHash = output.PreviousHash
 	json.Index = output.Index
-	json.Used = output.Used
 	return json
 }
 
-// Convert model.Transaction to transactionJSON
-func convertTransaction(transaction model.Transaction) transactionJSON {
-	json := transactionJSON{}
+// Convert model.Transaction to simpleTransaction
+func convertTransaction(transaction model.Transaction) simpleTransaction {
+	json := simpleTransaction{}
 
-	json.Inputs = make([]inputJSON, len(transaction.Inputs))
+	json.Inputs = make([]simpleInput, len(transaction.Inputs))
 	for i, input := range transaction.Inputs {
 		utxo := input.UTXO
 		json.Inputs[i].UTXO = convertOutput(utxo)
@@ -198,7 +176,7 @@ func convertTransaction(transaction model.Transaction) transactionJSON {
 		json.Inputs[i].Signature2 = input.Signature2
 	}
 
-	json.Outputs = make([]outputJSON, len(transaction.Outputs))
+	json.Outputs = make([]simpleOutput, len(transaction.Outputs))
 	for i, output := range transaction.Outputs {
 		json.Outputs[i] = convertOutput(output)
 	}
@@ -267,7 +245,7 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 			db.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).Find(&input.Siblings)
 			if !verifyUTXO(utxo, input.Siblings) {
 				c.JSON(http.StatusOK, gin.H{
-					"message": "UTXO does not have enough signatures.",
+					"message": "One of signatures of servers is not valid.",
 				})
 				return
 			}
