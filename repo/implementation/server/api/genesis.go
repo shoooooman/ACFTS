@@ -11,9 +11,6 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-// N is number of servers
-const N = 4
-
 // key is a private key of this server
 var key *ecdsa.PrivateKey
 

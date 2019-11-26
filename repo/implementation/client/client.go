@@ -112,7 +112,7 @@ func getSiblings(utxo model.Output) string {
 
 	str := ""
 	for _, sibling := range siblings {
-		// usedとsiblingsは初期値(サーバー側で署名される時の値が初期値だから)
+		// used and signatures are initial values because it is when they are signed.
 		s := `
 				{
 					"amount": ` + strconv.Itoa(sibling.Amount) + `,
@@ -205,7 +205,7 @@ func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, bool) {
 	for _, candidate := range candidates {
 		count := 0
 		db.Table("signatures").Where("output_id = ?", candidate.ID).Count(&count)
-		if float64(count) >= 2.0*N/3.0 {
+		if float64(count) >= 2.0*float64(n)/3.0 {
 			utxos = append(utxos, candidate)
 		}
 	}
@@ -271,12 +271,20 @@ type genesisJSON struct {
 func createGenesis(urls []string, owner int, amount int) {
 	priKey := keys[owner]
 	pubKey := &priKey.PublicKey
-	sigs := []model.Signature{
-		{Address1: "dum", Address2: "my1", Signature1: "gene", Signature2: "sis1", OutputID: 1},
-		{Address1: "dum", Address2: "my2", Signature1: "gene", Signature2: "sis2", OutputID: 1},
-		{Address1: "dum", Address2: "my3", Signature1: "gene", Signature2: "sis3", OutputID: 1},
-		{Address1: "dum", Address2: "my4", Signature1: "gene", Signature2: "sis4", OutputID: 1},
+
+	// Dummy signatures for genesis
+	sig := model.Signature{
+		Address1:   "gene",
+		Address2:   "sis",
+		Signature1: "dum",
+		Signature2: "my",
+		OutputID:   1,
 	}
+	sigs := make([]model.Signature, n)
+	for i := 0; i < n; i++ {
+		sigs[i] = sig
+	}
+
 	genesis := model.Output{
 		Amount:       amount,
 		Address1:     pubKey.X.String(),
@@ -321,7 +329,7 @@ func generateClients(num int) {
 	}
 }
 
-func executeTxs(baseURLs []string, txs []simpleTx, p bool, finished chan bool) {
+func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan bool) {
 	for i := 0; i < len(txs); i++ {
 		jsonStr := createJSONStr(txs[i])
 		fmt.Println(jsonStr)
@@ -361,7 +369,7 @@ func executeTxs(baseURLs []string, txs []simpleTx, p bool, finished chan bool) {
 			}
 		}
 	}
-	if p {
+	if async {
 		finished <- true
 	}
 }
@@ -373,8 +381,8 @@ var keys []*ecdsa.PrivateKey
 // Get a private key from a public key (PublicKey.X + PublicKey.Y)
 var pub2Pri map[string]*ecdsa.PrivateKey
 
-// N is number of servers
-const N = 4
+// n is the number of servers
+const n = 4
 
 func main() {
 	baseURLs := []string{

@@ -79,7 +79,7 @@ func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 	return false
 }
 
-func verifyUTXO(utxo model.Output, siblings []model.Output) bool {
+func verifyUTXO(utxo model.Output, siblings []model.Output, n int) bool {
 	// Genesis is approved without verification
 	if utxo.PreviousHash == "genesis" {
 		fmt.Println("genesis is approved without verification.")
@@ -120,7 +120,7 @@ func verifyUTXO(utxo model.Output, siblings []model.Output) bool {
 		if ecdsa.Verify(&serverPubKey, hashed, signature1, signature2) {
 			valid++
 			fmt.Println("one valid signature")
-			if float64(valid) >= 2.0*N/3.0 {
+			if float64(valid) >= 2.0*float64(n)/3.0 {
 				fmt.Println("Server Verifyed!")
 				return true
 			}
@@ -185,13 +185,13 @@ func convertTransaction(transaction model.Transaction) simpleTransaction {
 }
 
 // VerifyTransaction is
-func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
+func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var transaction model.Transaction
 		c.BindJSON(&transaction)
 
 		inputs := transaction.Inputs
-		if inputs == nil {
+		if len(inputs) == 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"message": "There are no inputs.",
 			})
@@ -199,7 +199,7 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		outputs := transaction.Outputs
-		if outputs == nil {
+		if len(outputs) == 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"message": "There are no outputs.",
 			})
@@ -243,7 +243,7 @@ func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 
 			// Update gorm.Model of Siblings
 			db.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).Find(&input.Siblings)
-			if !verifyUTXO(utxo, input.Siblings) {
+			if !verifyUTXO(utxo, input.Siblings, n) {
 				c.JSON(http.StatusOK, gin.H{
 					"message": "One of signatures of servers is not valid.",
 				})
