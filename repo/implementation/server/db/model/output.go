@@ -11,7 +11,7 @@ type Output struct {
 	Address1     string      `json:"address1"`
 	Address2     string      `json:"address2"`
 	PreviousHash string      `json:"previous_hash"`
-	Index        uint        `json:"index"`
+	Index        uint        `json:"index" gorm:"column:output_index"`
 	Used         bool        `json:"used"`
 	Signatures   []Signature `json:"server_signatures"`
 }

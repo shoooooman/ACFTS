@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
+	mrand "math/rand"
 	"net/http"
 	"strconv"
 
@@ -119,6 +120,7 @@ func getSiblings(utxo model.Output) string {
 					"address1": "` + sibling.Address1 + `",
 					"address2": "` + sibling.Address2 + `",
 					"previous_hash": "` + sibling.PreviousHash + `",
+					"index": ` + strconv.Itoa(int(sibling.Index)) + `,
 					"used": false,
 					"signatures": []
 				},`
@@ -144,6 +146,7 @@ func createInputStr(utxos []model.Output) string {
 				"address1": "` + utxo.Address1 + `",
 				"address2": "` + utxo.Address2 + `",
 				"previous_hash": "` + utxo.PreviousHash + `",
+				"index": ` + strconv.Itoa(int(utxo.Index)) + `,
 				"server_signatures": ` + getServerSigs(utxo) + `
 			},
 			"siblings": ` + getSiblings(utxo) + `,
@@ -193,14 +196,12 @@ type simpleTx struct {
 }
 
 func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, int) {
-	fmt.Println("finding utxos")
-
 	var candidates []model.Output
 	address1 := publicKey.X.String()
 	address2 := publicKey.Y.String()
 
+	// For mutual exclusion of db
 	c <- true
-	fmt.Println("c <- true")
 
 	// TODO: signatures > 2/3のUTXOをSQLで見つける
 	db.Where("address1 = ? AND address2 = ? AND used = false", address1, address2).
@@ -224,14 +225,6 @@ func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, int) {
 	sum := 0
 	for i, utxo := range utxos {
 		sum += utxo.Amount
-
-		db.First(&utxo)
-		if utxo.Used {
-			fmt.Println("bug!")
-		} else {
-			fmt.Println("maked true")
-		}
-
 		// FIXME: serverにこのUTXOが拒否されたら整合性が失われる
 		db.Model(&utxo).Update("used", true)
 		// FIXME: >= ではなく==にする
@@ -362,7 +355,7 @@ func generateClients(num int) {
 func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan bool) {
 	for i := 0; i < len(txs); i++ {
 		jsonStr := createJSONStr(txs[i])
-		fmt.Println(jsonStr)
+		// fmt.Println(jsonStr)
 
 		// FIXME: 全てのサーバーに送るようにし，2/3以上からの応答を待つ
 		// FIXME: リクエストを送ってレスポンスを受け取る部分は並行処理の方がいい？
@@ -375,7 +368,7 @@ func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan boo
 			if err != nil {
 				panic(err)
 			}
-			fmt.Println(response)
+			// fmt.Println(response)
 			fmt.Println("Message: " + response.Message)
 
 			outputs := response.Transaction.Outputs
@@ -413,7 +406,7 @@ var keys []*ecdsa.PrivateKey
 var pub2Pri map[string]*ecdsa.PrivateKey
 
 // n is the number of servers
-const n = 4
+const n = 2
 
 // For mutual exclusion of db
 var c chan bool
@@ -422,8 +415,8 @@ func main() {
 	baseURLs := []string{
 		"http://localhost:8080",
 		"http://localhost:8081",
-		"http://localhost:8082",
-		"http://localhost:8083",
+		// "http://localhost:8082",
+		// "http://localhost:8083",
 	}
 	db = initDB()
 	defer db.Close()
@@ -438,13 +431,13 @@ func main() {
 	c = make(chan bool, 1)
 
 	// Make sample transactions
-	// case 1
-	txs1 := []simpleTx{
-		{From: 0, To: []int{1}, Amounts: []int{200}},
-	}
-	executeTxs(baseURLs, txs1, false, nil)
+	// case 1: 0 -> 1
+	// txs1 := []simpleTx{
+	// 	{From: 0, To: []int{1}, Amounts: []int{200}},
+	// }
+	// executeTxs(baseURLs, txs1, false, nil)
 
-	// case 2
+	// case 2: 0 <-> 1
 	// tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{200}}
 	// tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{200}}
 	// txs1 := []simpleTx{}
@@ -454,7 +447,7 @@ func main() {
 	// }
 	// executeTxs(baseURLs, txs1, false, nil)
 
-	// case 3
+	// case 3: 0 <-> 1 & 2 <-> 3 (parallelly)
 	// finished := make(chan bool)
 	//
 	// tx0 := simpleTx{From: 0, To: []int{0, 2}, Amounts: []int{50, 150}}
@@ -480,7 +473,7 @@ func main() {
 	// <-finished
 	// <-finished
 
-	// case 4
+	// case 4: 0 <-> 1 & 1 <-> 2 & 2 <-> 3 & 3 <-> 0 (parallelly)
 	// finished := make(chan bool)
 	//
 	// tx0 := simpleTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
@@ -519,4 +512,20 @@ func main() {
 	// <-finished
 	// <-finished
 	// <-finished
+
+	// case 4.2: random -> random
+	tx0 := simpleTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
+	txs0 := []simpleTx{}
+	txs0 = append(txs0, tx0)
+	executeTxs(baseURLs, txs0, false, nil)
+
+	txs1 := []simpleTx{}
+	for i := 0; i < 25; i++ {
+		from := mrand.Intn(4)
+		to := mrand.Intn(4)
+		tx1 := simpleTx{From: from, To: []int{to}, Amounts: []int{1}}
+		txs1 = append(txs1, tx1)
+	}
+
+	executeTxs(baseURLs, txs1, false, nil)
 }

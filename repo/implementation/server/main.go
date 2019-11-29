@@ -13,7 +13,7 @@ import (
 )
 
 // n is the number of servers
-const n = 4
+const n = 2
 
 func initDB(port int) *gorm.DB {
 	db, err := gorm.Open("mysql", "root:@tcp(127.0.0.1:3306)/acfts_"+strconv.Itoa(port)+"?charset=utf8&parseTime=True&loc=Local")
