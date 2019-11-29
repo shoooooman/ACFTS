@@ -15,6 +15,7 @@ import (
 	mrand "math/rand"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/jinzhu/gorm"
 
@@ -520,6 +521,7 @@ func main() {
 	executeTxs(baseURLs, txs0, false, nil)
 
 	txs1 := []simpleTx{}
+	mrand.Seed(time.Now().UnixNano())
 	for i := 0; i < 25; i++ {
 		from := mrand.Intn(4)
 		to := mrand.Intn(4)
