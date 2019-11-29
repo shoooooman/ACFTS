@@ -206,11 +206,23 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			return
 		}
 
+		// FIXME: 途中でreturnするところでRollback or Commitすべき？
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+				c.JSON(http.StatusOK, gin.H{
+					"message": "Rollback!!!!",
+				})
+				return
+			}
+		}()
+
 		inputAmount := 0
 		for _, input := range inputs {
 			utxo := input.UTXO
 			count := 0
-			db.Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).First(&utxo).Count(&count)
+			tx.Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).First(&utxo).Count(&count)
 			if count == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"message": "Input is not valid.",
@@ -242,7 +254,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			}
 
 			// Update gorm.Model of Siblings
-			db.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).Find(&input.Siblings)
+			tx.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).Find(&input.Siblings)
 			if !verifyUTXO(utxo, input.Siblings, n) {
 				c.JSON(http.StatusOK, gin.H{
 					"message": "One of signatures of servers is not valid.",
@@ -270,13 +282,25 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			// db.Model(&utxo).Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).Update("used", true)
 			// db.Unscoped().Delete(&utxo)
 
-			db.Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).First(&utxo).Update("used", true)
+			// FIXME: indexを入れる
+			tx.Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).First(&utxo)
+			if utxo.Used {
+				c.JSON(http.StatusOK, gin.H{
+					"message": "bug!!",
+				})
+				return
+			}
+
+			// FIXME: indexを入れる
+			tx.Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).First(&utxo).Update("used", true)
 			transaction.Inputs[i].UTXO = utxo
 		}
+		tx.Commit()
 
 		for i, output := range outputs {
 			db.Create(&output)
 
+			// FIXME: indexを入れる
 			db.Where("address1 = ? AND address2 = ? AND previous_hash = ?", output.Address1, output.Address2, output.PreviousHash).First(&output)
 			transaction.Outputs[i] = output
 		}

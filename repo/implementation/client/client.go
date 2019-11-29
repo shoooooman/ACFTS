@@ -192,10 +192,16 @@ type simpleTx struct {
 	Amounts []int
 }
 
-func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, bool) {
+func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, int) {
+	fmt.Println("finding utxos")
+
 	var candidates []model.Output
 	address1 := publicKey.X.String()
 	address2 := publicKey.Y.String()
+
+	c <- true
+	fmt.Println("c <- true")
+
 	// TODO: signatures > 2/3のUTXOをSQLで見つける
 	db.Where("address1 = ? AND address2 = ? AND used = false", address1, address2).
 		Find(&candidates)
@@ -210,34 +216,46 @@ func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, bool) {
 		}
 	}
 	if len(utxos) == 0 {
-		return nil, false
+		<-c
+		return nil, 0
 	}
 
 	// Collect transactions so that the amount of them becomes equal to the arguement
 	sum := 0
 	for i, utxo := range utxos {
 		sum += utxo.Amount
-		db.Model(&utxo).Where("address1 = ? AND address2 = ? AND used = false", address1, address2).Update("used", true)
+
+		db.First(&utxo)
+		if utxo.Used {
+			fmt.Println("bug!")
+		} else {
+			fmt.Println("maked true")
+		}
+
+		// FIXME: serverにこのUTXOが拒否されたら整合性が失われる
+		db.Model(&utxo).Update("used", true)
 		// FIXME: >= ではなく==にする
 		if sum >= amount {
 			utxos = utxos[:i+1]
-			return utxos, true
+			<-c
+			return utxos, sum
 		}
 	}
 
 	fmt.Println("There are no enough utxos.")
-	return nil, false
+	<-c
+	return nil, 0
 }
 
 func createJSONStr(tx simpleTx) string {
 	priKey := keys[tx.From]
 	pubKey := &priKey.PublicKey
-	sum := 0
+	want := 0
 	for _, val := range tx.Amounts {
-		sum += val
+		want += val
 	}
-	utxos, exists := findUTXOs(pubKey, sum)
-	if !exists {
+	utxos, sum := findUTXOs(pubKey, want)
+	if sum == 0 {
 		// TODO: このclient番号に紐づいている有効なUTXOがなかった場合
 		// トランザクションの作成を保留にすべき？
 		fmt.Printf("There are no valid utxos of client %v\n", tx.From)
@@ -251,6 +269,18 @@ func createJSONStr(tx simpleTx) string {
 		priKey := keys[index]
 		pubKey := &priKey.PublicKey
 		ops[i] = model.Output{Amount: tx.Amounts[i], Address1: pubKey.X.String(), Address2: pubKey.Y.String(), PreviousHash: hash}
+	}
+	// Create a change transaction if the sum of utxos exceeds want
+	if sum > want {
+		selfKey := keys[tx.From]
+		selfPubKey := &selfKey.PublicKey
+		change := model.Output{
+			Amount:       sum - want,
+			Address1:     selfPubKey.X.String(),
+			Address2:     selfPubKey.Y.String(),
+			PreviousHash: hash,
+		}
+		ops = append(ops, change)
 	}
 	outputs := createOutputStr(ops, hash)
 
@@ -346,6 +376,7 @@ func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan boo
 				panic(err)
 			}
 			fmt.Println(response)
+			fmt.Println("Message: " + response.Message)
 
 			outputs := response.Transaction.Outputs
 			sigs := model.Signature{
@@ -359,8 +390,8 @@ func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan boo
 				if j == 0 {
 					db.Create(&output)
 				} else {
-					db.Where("address1 = ? AND address2 = ? AND previous_hash = ?",
-						output.Address1, output.Address2, output.PreviousHash).
+					db.Where("address1 = ? AND address2 = ? AND previous_hash = ? AND output_index = ?",
+						output.Address1, output.Address2, output.PreviousHash, output.Index).
 						First(&output)
 				}
 				// Add a signature of server i
@@ -384,6 +415,9 @@ var pub2Pri map[string]*ecdsa.PrivateKey
 // n is the number of servers
 const n = 4
 
+// For mutual exclusion of db
+var c chan bool
+
 func main() {
 	baseURLs := []string{
 		"http://localhost:8080",
@@ -400,6 +434,8 @@ func main() {
 
 	// Make a genesis transaction
 	createGenesis(baseURLs, 0, 200)
+
+	c = make(chan bool, 1)
 
 	// Make sample transactions
 	// case 1
@@ -441,6 +477,46 @@ func main() {
 	//
 	// go executeTxs(baseURLs, txs1, true, finished)
 	// go executeTxs(baseURLs, txs2, true, finished)
+	// <-finished
+	// <-finished
+
+	// case 4
+	// finished := make(chan bool)
+	//
+	// tx0 := simpleTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
+	// txs0 := []simpleTx{}
+	// txs0 = append(txs0, tx0)
+	// executeTxs(baseURLs, txs0, false, nil)
+	//
+	// tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{50}}
+	// tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{50}}
+	// tx3 := simpleTx{From: 1, To: []int{2}, Amounts: []int{50}}
+	// tx4 := simpleTx{From: 2, To: []int{1}, Amounts: []int{50}}
+	// tx5 := simpleTx{From: 2, To: []int{3}, Amounts: []int{50}}
+	// tx6 := simpleTx{From: 3, To: []int{2}, Amounts: []int{50}}
+	// tx7 := simpleTx{From: 3, To: []int{0}, Amounts: []int{50}}
+	// tx8 := simpleTx{From: 0, To: []int{3}, Amounts: []int{50}}
+	// txs1 := []simpleTx{}
+	// txs2 := []simpleTx{}
+	// txs3 := []simpleTx{}
+	// txs4 := []simpleTx{}
+	// for i := 0; i < 25; i++ {
+	// 	txs1 = append(txs1, tx1)
+	// 	txs1 = append(txs1, tx2)
+	// 	txs2 = append(txs2, tx3)
+	// 	txs2 = append(txs2, tx4)
+	// 	txs3 = append(txs3, tx5)
+	// 	txs3 = append(txs3, tx6)
+	// 	txs4 = append(txs4, tx7)
+	// 	txs4 = append(txs4, tx8)
+	// }
+	//
+	// go executeTxs(baseURLs, txs1, true, finished)
+	// go executeTxs(baseURLs, txs2, true, finished)
+	// go executeTxs(baseURLs, txs3, true, finished)
+	// go executeTxs(baseURLs, txs4, true, finished)
+	// <-finished
+	// <-finished
 	// <-finished
 	// <-finished
 }
