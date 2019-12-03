@@ -165,14 +165,14 @@ func createInputStr(utxos []model.Output) string {
 
 func createOutputStr(ops []model.Output, hash string) string {
 	outputs := ""
-	for i, op := range ops {
+	for _, op := range ops {
 		outputStr := `
 		{
 			"amount": ` + strconv.Itoa(op.Amount) + `,
 			"address1": "` + op.Address1 + `",
 			"address2": "` + op.Address2 + `",
 			"previous_hash": "` + hash + `",
-			"index": ` + strconv.Itoa(i) + `
+			"index": ` + strconv.Itoa(int(op.Index)) + `
 		},`
 
 		outputs += outputStr
@@ -267,6 +267,7 @@ func createJSONStr(tx simpleTx) string {
 			Address1:     pubKey.X.String(),
 			Address2:     pubKey.Y.String(),
 			PreviousHash: hash,
+			Index:        uint(i),
 		}
 	}
 	// Create a change transaction if the sum of utxos exceeds want
@@ -278,6 +279,7 @@ func createJSONStr(tx simpleTx) string {
 			Address1:     selfPubKey.X.String(),
 			Address2:     selfPubKey.Y.String(),
 			PreviousHash: hash,
+			Index:        uint(len(ops)),
 		}
 		ops = append(ops, change)
 	}
@@ -541,13 +543,13 @@ func main() {
 	// <-finished
 
 	// case 5: random -> random
+	mrand.Seed(time.Now().UnixNano())
 	tx0 := simpleTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
 	txs0 := []simpleTx{}
 	txs0 = append(txs0, tx0)
 	executeTxs(baseURLs, txs0, false, nil)
 
 	txs1 := []simpleTx{}
-	mrand.Seed(time.Now().UnixNano())
 	for i := 0; i < 25; i++ {
 		from := mrand.Intn(4)
 		to := mrand.Intn(4)
