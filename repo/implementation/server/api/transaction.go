@@ -256,7 +256,8 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			}
 
 			// Update gorm.Model of Siblings
-			tx.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).Find(&input.Siblings)
+			tx.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).
+				Find(&input.Siblings)
 			if !verifyUTXO(utxo, input.Siblings, n) {
 				c.JSON(http.StatusOK, gin.H{
 					"message": "One of signatures of servers is not valid.",
@@ -281,7 +282,8 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 
 		for i, input := range inputs {
 			utxo := input.UTXO
-			// db.Model(&utxo).Where("address1 = ? AND address2 = ? AND previous_hash = ?", utxo.Address1, utxo.Address2, utxo.PreviousHash).Update("used", true)
+			// db.Model(&utxo).Where("address1 = ? AND address2 = ? AND previous_hash = ?",
+			// 	utxo.Address1, utxo.Address2, utxo.PreviousHash).Update("used", true)
 			// db.Unscoped().Delete(&utxo)
 
 			tx.Where("address1 = ? AND address2 = ? AND previous_hash = ? AND output_index = ?",

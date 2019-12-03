@@ -262,7 +262,12 @@ func createJSONStr(tx simpleTx) string {
 	for i, index := range tx.To {
 		priKey := keys[index]
 		pubKey := &priKey.PublicKey
-		ops[i] = model.Output{Amount: tx.Amounts[i], Address1: pubKey.X.String(), Address2: pubKey.Y.String(), PreviousHash: hash}
+		ops[i] = model.Output{
+			Amount:       tx.Amounts[i],
+			Address1:     pubKey.X.String(),
+			Address2:     pubKey.Y.String(),
+			PreviousHash: hash,
+		}
 	}
 	// Create a change transaction if the sum of utxos exceeds want
 	if sum > want {
