@@ -287,15 +287,6 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			// db.Unscoped().Delete(&utxo)
 
 			tx.Where("address1 = ? AND address2 = ? AND previous_hash = ? AND output_index = ?",
-				utxo.Address1, utxo.Address2, utxo.PreviousHash, utxo.Index).First(&utxo)
-			if utxo.Used {
-				c.JSON(http.StatusOK, gin.H{
-					"message": "bug!!",
-				})
-				return
-			}
-
-			tx.Where("address1 = ? AND address2 = ? AND previous_hash = ? AND output_index = ?",
 				utxo.Address1, utxo.Address2, utxo.PreviousHash, utxo.Index).
 				First(&utxo).Update("used", true)
 			transaction.Inputs[i].UTXO = utxo
@@ -304,10 +295,6 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 
 		for i, output := range outputs {
 			db.Create(&output)
-
-			db.Where("address1 = ? AND address2 = ? AND previous_hash = ? AND output_index = ?",
-				output.Address1, output.Address2, output.PreviousHash, output.Index).
-				First(&output)
 			transaction.Outputs[i] = output
 		}
 
