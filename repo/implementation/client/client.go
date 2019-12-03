@@ -474,7 +474,7 @@ func main() {
 	// <-finished
 	// <-finished
 
-	// case 4: 0 <-> 1 & 1 <-> 2 & 2 <-> 3 & 3 <-> 0 (parallelly)
+	// case 4.1: 0 <-> 1 & 1 <-> 2 & 2 <-> 3 & 3 <-> 0 (parallelly)
 	// finished := make(chan bool)
 	//
 	// tx0 := simpleTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
@@ -514,7 +514,28 @@ func main() {
 	// <-finished
 	// <-finished
 
-	// case 4.2: random -> random
+	// case 4.2: 0 <-> 1 & 0 <-> 1 (parallelly)
+	// finished := make(chan bool)
+	//
+	// tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{100}}
+	// tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{100}}
+	// tx3 := simpleTx{From: 0, To: []int{1}, Amounts: []int{100}}
+	// tx4 := simpleTx{From: 1, To: []int{0}, Amounts: []int{100}}
+	// txs1 := []simpleTx{}
+	// txs2 := []simpleTx{}
+	// for i := 0; i < 25; i++ {
+	// 	txs1 = append(txs1, tx1)
+	// 	txs1 = append(txs1, tx2)
+	// 	txs2 = append(txs2, tx3)
+	// 	txs2 = append(txs2, tx4)
+	// }
+	//
+	// go executeTxs(baseURLs, txs1, true, finished)
+	// go executeTxs(baseURLs, txs2, true, finished)
+	// <-finished
+	// <-finished
+
+	// case 5: random -> random
 	tx0 := simpleTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
 	txs0 := []simpleTx{}
 	txs0 = append(txs0, tx0)
