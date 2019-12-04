@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/big"
 	mrand "math/rand"
 	"net/http"
@@ -25,8 +26,8 @@ import (
 func initDB() *gorm.DB {
 	db, err := gorm.Open("mysql", "root:@tcp(127.0.0.1:3306)/acfts_client?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
-		fmt.Println(err)
-		panic("failed to connect database")
+		log.Println("failed to connect database")
+		log.Panicln(err)
 	}
 
 	db.AutoMigrate(&model.Output{})
@@ -42,7 +43,7 @@ func post(url, jsonStr string) []byte {
 		bytes.NewBuffer([]byte(jsonStr)),
 	)
 	if err != nil {
-		panic(err)
+		log.Panicln(err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -50,13 +51,13 @@ func post(url, jsonStr string) []byte {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		log.Panicln(err)
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	return body
@@ -80,7 +81,7 @@ func getClientSig(utxo model.Output) signature {
 	pub := utxo.Address1 + utxo.Address2
 	r, s, err := ecdsa.Sign(rand.Reader, pub2Pri[pub], hashed)
 	if err != nil {
-		panic(err)
+		log.Panicln(err)
 	}
 	sig := signature{r, s}
 
@@ -158,7 +159,11 @@ func createInputStr(utxos []model.Output) string {
 		inputs += inputStr
 	}
 	// Remove the last ','
-	inputs = "[" + inputs[:len(inputs)-1] + "]"
+	if len(inputs) > 0 {
+		inputs = "[" + inputs[:len(inputs)-1] + "]"
+	} else {
+		inputs = "[]"
+	}
 
 	return inputs
 }
@@ -178,7 +183,11 @@ func createOutputStr(ops []model.Output, hash string) string {
 		outputs += outputStr
 	}
 	// Remove the last ','
-	outputs = "[" + outputs[:len(outputs)-1] + "]"
+	if len(outputs) > 0 {
+		outputs = "[" + outputs[:len(outputs)-1] + "]"
+	} else {
+		outputs = "[]"
+	}
 
 	return outputs
 }
@@ -226,22 +235,23 @@ func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, int) {
 	sum := 0
 	for i, utxo := range utxos {
 		sum += utxo.Amount
-		// FIXME: serverにこのUTXOが拒否されたら整合性が失われる
-		db.Model(&utxo).Update("used", true)
 		// FIXME: >= ではなく==にする
 		if sum >= amount {
 			utxos = utxos[:i+1]
+			for _, utxo := range utxos {
+				// FIXME: serverにこのUTXOが拒否されたら整合性が失われる
+				db.Model(&utxo).Update("used", true)
+			}
 			<-c
 			return utxos, sum
 		}
 	}
 
-	fmt.Println("There are no enough utxos.")
 	<-c
 	return nil, 0
 }
 
-func createJSONStr(tx simpleTx) string {
+func createJSONStr(tx simpleTx) (string, error) {
 	priKey := keys[tx.From]
 	pubKey := &priKey.PublicKey
 	want := 0
@@ -252,8 +262,7 @@ func createJSONStr(tx simpleTx) string {
 	if sum == 0 {
 		// TODO: このclient番号に紐づいている有効なUTXOがなかった場合
 		// トランザクションの作成を保留にすべき？
-		fmt.Printf("There are no valid utxos of client %v\n", tx.From)
-		return ""
+		return "", fmt.Errorf("Error: there are no enough utxos of client %v", tx.From)
 	}
 	inputs := createInputStr(utxos)
 	hash := getPreviousHash(inputs)
@@ -291,7 +300,7 @@ func createJSONStr(tx simpleTx) string {
 	"outputs": ` + outputs + `
 }`
 
-	return jsonStr
+	return jsonStr, nil
 }
 
 type genesisJSON struct {
@@ -341,7 +350,7 @@ func createGenesis(urls []string, owner int, amount int) {
 		var g genesisJSON
 		err := json.Unmarshal(body, &g)
 		if err != nil {
-			panic(err)
+			log.Panicln(err)
 		}
 	}
 }
@@ -353,7 +362,7 @@ func generateClients(num int) {
 		var err error
 		keys[i], err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 		if err != nil {
-			panic(err)
+			log.Panicln(err)
 		}
 		pub := &keys[i].PublicKey
 		pub2Pri[pub.X.String()+pub.Y.String()] = keys[i]
@@ -362,7 +371,11 @@ func generateClients(num int) {
 
 func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan bool) {
 	for i := 0; i < len(txs); i++ {
-		jsonStr := createJSONStr(txs[i])
+		jsonStr, err := createJSONStr(txs[i])
+		if err != nil {
+			log.Println(err)
+			return
+		}
 		// fmt.Println(jsonStr)
 
 		// FIXME: 全てのサーバーに送るようにし，2/3以上からの応答を待つ
@@ -374,7 +387,7 @@ func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan boo
 			response := model.Response{}
 			err := json.Unmarshal(body, &response)
 			if err != nil {
-				panic(err)
+				log.Panicln(err)
 			}
 			// fmt.Println(response)
 			fmt.Println("Message: " + response.Message)
