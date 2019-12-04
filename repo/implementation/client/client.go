@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/big"
 	mrand "math/rand"
 	"net/http"
 	"strconv"
@@ -63,12 +62,7 @@ func post(url, jsonStr string) []byte {
 	return body
 }
 
-type signature struct {
-	r *big.Int
-	s *big.Int
-}
-
-func getClientSig(utxo model.Output) signature {
+func getClientSig(utxo model.Output) (string, string) {
 	// Convert addresses to bytes to get its hash
 	buf := []byte(fmt.Sprintf("%v%v%v", utxo.Address1, utxo.Address2, utxo.PreviousHash))
 
@@ -83,9 +77,8 @@ func getClientSig(utxo model.Output) signature {
 	if err != nil {
 		log.Panicln(err)
 	}
-	sig := signature{r, s}
 
-	return sig
+	return r.String(), s.String()
 }
 
 func getServerSigs(utxo model.Output) string {
@@ -141,7 +134,7 @@ func getSiblings(utxo model.Output) string {
 func createInputStr(utxos []model.Output) string {
 	inputs := ""
 	for _, utxo := range utxos {
-		sig := getClientSig(utxo)
+		sig1, sig2 := getClientSig(utxo)
 		inputStr := `
 		{
 			"utxo": {
@@ -152,8 +145,8 @@ func createInputStr(utxos []model.Output) string {
 				"server_signatures": ` + getServerSigs(utxo) + `
 			},
 			"siblings": ` + getSiblings(utxo) + `,
-			"signature1": "` + sig.r.String() + `",
-			"signature2": "` + sig.s.String() + `"
+			"signature1": "` + sig1 + `",
+			"signature2": "` + sig2 + `"
 		},`
 
 		inputs += inputStr
