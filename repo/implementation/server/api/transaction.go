@@ -7,6 +7,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
 
@@ -68,8 +69,12 @@ func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 
 	// model.Output.Address1 and Address2 represent a public key
 	// Convert Address1 and Address2 to ecdsa.PublicKey
-	address1, _ := new(big.Int).SetString(utxo.Address1, 10)
-	address2, _ := new(big.Int).SetString(utxo.Address2, 10)
+	address1, ok1 := new(big.Int).SetString(utxo.Address1, 10)
+	address2, ok2 := new(big.Int).SetString(utxo.Address2, 10)
+	if !ok1 || !ok2 {
+		log.Println("Error: an address of a server is not valid.")
+		return false
+	}
 	publicKey := ecdsa.PublicKey{elliptic.P521(), address1, address2}
 
 	if ecdsa.Verify(&publicKey, hashed, n1, n2) {
@@ -112,11 +117,19 @@ func verifyUTXO(utxo model.Output, siblings []model.Output, n int) bool {
 	valid := 0
 	for _, signature := range utxo.Signatures {
 		// FIXME: Should get public keys of other servers independently of clients
-		address1, _ := new(big.Int).SetString(signature.Address1, 10)
-		address2, _ := new(big.Int).SetString(signature.Address2, 10)
+		address1, ok1 := new(big.Int).SetString(signature.Address1, 10)
+		address2, ok2 := new(big.Int).SetString(signature.Address2, 10)
+		if !ok1 || !ok2 {
+			log.Println("Error: an address of a server is not valid")
+			return false
+		}
 		serverPubKey := ecdsa.PublicKey{elliptic.P521(), address1, address2}
-		signature1, _ := new(big.Int).SetString(signature.Signature1, 10)
-		signature2, _ := new(big.Int).SetString(signature.Signature2, 10)
+		signature1, ok1 := new(big.Int).SetString(signature.Signature1, 10)
+		signature2, ok2 := new(big.Int).SetString(signature.Signature2, 10)
+		if !ok1 || !ok2 {
+			log.Println("Error: a signature of server is not valid")
+			return false
+		}
 		if ecdsa.Verify(&serverPubKey, hashed, signature1, signature2) {
 			valid++
 			fmt.Println("one valid signature")
@@ -206,13 +219,12 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			return
 		}
 
-		// FIXME: 途中でreturnするところでRollback or Commitすべき？
 		tx := db.Begin()
 		defer func() {
 			if r := recover(); r != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{
-					"message": "Rollback!!!!",
+					"message": "Transacton error. Rollback.",
 				})
 				return
 			}
@@ -229,12 +241,14 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{
 					"message": "Input is not valid.",
 				})
+				tx.Rollback()
 				return
 			}
 			if utxo.Used {
 				c.JSON(http.StatusBadRequest, gin.H{
 					"message": "UTXO is used.",
 				})
+				tx.Rollback()
 				return
 			}
 			/* When choosing to delete records of outputs
@@ -252,6 +266,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{
 					"message": "Could not unlock UTXO.",
 				})
+				tx.Rollback()
 				return
 			}
 
@@ -262,6 +277,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{
 					"message": "One of signatures of servers is not valid.",
 				})
+				tx.Rollback()
 				return
 			}
 
@@ -277,6 +293,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": "Amount of inputs is different from amount of outputs.",
 			})
+			tx.Rollback()
 			return
 		}
 
