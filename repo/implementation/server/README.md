@@ -1,4 +1,4 @@
-# Server-Side
+# Server-side
 
 ## Setup
 

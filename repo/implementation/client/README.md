@@ -1,4 +1,4 @@
-# Client-Side
+# Client-side
 
 ## Setup
 
@@ -21,6 +21,7 @@ $ go run client.go
 Initially, four clients (i.e. four public keys) are generated and verification requests are sent to localhost with port number 8080, 8081, 8082 and 8083.
 
 There are six example cases now. Transaction: (from → to, amount)
+
 Genesis is bound to client 0 by default.
 
 - case 1: (0 → 1, 200)
