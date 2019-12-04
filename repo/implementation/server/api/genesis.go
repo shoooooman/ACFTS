@@ -37,7 +37,7 @@ func CreateGenesis(db *gorm.DB) gin.HandlerFunc {
 		db.Create(&genesis)
 
 		json := convertOutput(genesis)
-		c.JSON(http.StatusOK, gin.H{
+		c.JSON(http.StatusCreated, gin.H{
 			"message": "Genesis is created.",
 			"genesis": json,
 		})

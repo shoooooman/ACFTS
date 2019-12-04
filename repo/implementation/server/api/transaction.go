@@ -192,7 +192,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 
 		inputs := transaction.Inputs
 		if len(inputs) == 0 {
-			c.JSON(http.StatusOK, gin.H{
+			c.JSON(http.StatusBadRequest, gin.H{
 				"message": "There are no inputs.",
 			})
 			return
@@ -200,7 +200,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 
 		outputs := transaction.Outputs
 		if len(outputs) == 0 {
-			c.JSON(http.StatusOK, gin.H{
+			c.JSON(http.StatusBadRequest, gin.H{
 				"message": "There are no outputs.",
 			})
 			return
@@ -211,7 +211,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 		defer func() {
 			if r := recover(); r != nil {
 				tx.Rollback()
-				c.JSON(http.StatusOK, gin.H{
+				c.JSON(http.StatusInternalServerError, gin.H{
 					"message": "Rollback!!!!",
 				})
 				return
@@ -226,13 +226,13 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 				utxo.Address1, utxo.Address2, utxo.PreviousHash, utxo.Index).
 				First(&utxo).Count(&count)
 			if count == 0 {
-				c.JSON(http.StatusOK, gin.H{
+				c.JSON(http.StatusBadRequest, gin.H{
 					"message": "Input is not valid.",
 				})
 				return
 			}
 			if utxo.Used {
-				c.JSON(http.StatusOK, gin.H{
+				c.JSON(http.StatusBadRequest, gin.H{
 					"message": "UTXO is used.",
 				})
 				return
@@ -242,14 +242,14 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			// count := 0
 			// db.First(&utxo).Count(&count)
 			// if count == 0 {
-			// 	c.JSON(http.StatusOK, gin.H{
+			// 	c.JSON(http.StatusBadRequest, gin.H{
 			// 		"message": "There are no valid UTXOs.",
 			// 	})
 			// 	return
 			// }
 
 			if !unlockUTXO(utxo, input.Signature1, input.Signature2) {
-				c.JSON(http.StatusOK, gin.H{
+				c.JSON(http.StatusBadRequest, gin.H{
 					"message": "Could not unlock UTXO.",
 				})
 				return
@@ -259,7 +259,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			tx.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).
 				Find(&input.Siblings)
 			if !verifyUTXO(utxo, input.Siblings, n) {
-				c.JSON(http.StatusOK, gin.H{
+				c.JSON(http.StatusBadRequest, gin.H{
 					"message": "One of signatures of servers is not valid.",
 				})
 				return
@@ -274,7 +274,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 		}
 
 		if inputAmount != outputAmount {
-			c.JSON(http.StatusOK, gin.H{
+			c.JSON(http.StatusBadRequest, gin.H{
 				"message": "Amount of inputs is different from amount of outputs.",
 			})
 			return
@@ -301,7 +301,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 		r, s := createSignature(transaction)
 
 		json := convertTransaction(transaction)
-		c.JSON(http.StatusOK, gin.H{
+		c.JSON(http.StatusCreated, gin.H{
 			"message":     "Verified this transaction.",
 			"transaction": json,
 			"address1":    (&key.PublicKey).X.String(),
