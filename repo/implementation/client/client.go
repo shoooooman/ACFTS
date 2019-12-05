@@ -225,10 +225,10 @@ func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, int) {
 	}
 
 	// Collect transactions so that the amount of them becomes equal to the arguement
+	// FIXME: utxosをsortした方がいいかもしれない
 	sum := 0
 	for i, utxo := range utxos {
 		sum += utxo.Amount
-		// FIXME: >= ではなく==にする
 		if sum >= amount {
 			utxos = utxos[:i+1]
 			for _, utxo := range utxos {
@@ -371,7 +371,6 @@ func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan boo
 		}
 		// fmt.Println(jsonStr)
 
-		// FIXME: 全てのサーバーに送るようにし，2/3以上からの応答を待つ
 		// FIXME: リクエストを送ってレスポンスを受け取る部分は並行処理の方がいい？
 		for j, baseURL := range baseURLs {
 			url := baseURL + "/transaction"
