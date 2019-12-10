@@ -15,15 +15,18 @@ import (
 	mrand "math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
 
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
 
-func initDB() *gorm.DB {
-	db, err := gorm.Open("mysql", "root:@tcp(127.0.0.1:3306)/acfts_client?charset=utf8&parseTime=True&loc=Local")
+func initDB(num int) *gorm.DB {
+	setting := fmt.Sprintf("root:@tcp(127.0.0.1:3306)/acfts_client_%d?charset=utf8&parseTime=True&loc=Local", num)
+	db, err := gorm.Open("mysql", setting)
 	if err != nil {
 		log.Println("failed to connect database")
 		log.Panicln(err)
@@ -33,6 +36,27 @@ func initDB() *gorm.DB {
 	db.AutoMigrate(&model.Signature{})
 
 	return db
+}
+
+func get(url string) []byte {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	return body
 }
 
 func post(url, jsonStr string) []byte {
@@ -192,16 +216,52 @@ func getPreviousHash(previous string) string {
 }
 
 // From, To: Number of clients
-type simpleTx struct {
+type insideTx struct {
 	From    int
 	To      []int
 	Amounts []int
 }
 
-func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, int) {
+type generalTx struct {
+	From    model.Address
+	To      []model.Address
+	Amounts []int
+}
+
+func convertInsideTxs(its []insideTx) []generalTx {
+	ats := make([]generalTx, len(its))
+	for i, it := range its {
+		fromPri := keys[it.From]
+		fromPub := &fromPri.PublicKey
+		from1 := fromPub.X.String()
+		from2 := fromPub.Y.String()
+		from := model.Address{from1, from2}
+
+		to := make([]model.Address, len(it.To))
+		for j, v := range it.To {
+			toPri := keys[v]
+			toPub := &toPri.PublicKey
+			t1 := toPub.X.String()
+			t2 := toPub.Y.String()
+			t := model.Address{t1, t2}
+			to[j] = t
+		}
+
+		at := generalTx{
+			From:    from,
+			To:      to,
+			Amounts: it.Amounts,
+		}
+		ats[i] = at
+	}
+
+	return ats
+}
+
+func findUTXOs(addr model.Address, amount int) ([]model.Output, int) {
 	var candidates []model.Output
-	address1 := publicKey.X.String()
-	address2 := publicKey.Y.String()
+	address1 := addr.Address1
+	address2 := addr.Address2
 
 	// For mutual exclusion of db
 	c <- true
@@ -244,9 +304,8 @@ func findUTXOs(publicKey *ecdsa.PublicKey, amount int) ([]model.Output, int) {
 	return nil, 0
 }
 
-func createJSONStr(tx simpleTx) (string, error) {
-	priKey := keys[tx.From]
-	pubKey := &priKey.PublicKey
+func createJSONStr(tx generalTx) (string, error) {
+	pubKey := tx.From
 	want := 0
 	for _, val := range tx.Amounts {
 		want += val
@@ -261,25 +320,25 @@ func createJSONStr(tx simpleTx) (string, error) {
 	hash := getPreviousHash(inputs)
 
 	ops := make([]model.Output, len(tx.To))
-	for i, index := range tx.To {
-		priKey := keys[index]
-		pubKey := &priKey.PublicKey
+	for i, addr := range tx.To {
 		ops[i] = model.Output{
-			Amount:       tx.Amounts[i],
-			Address1:     pubKey.X.String(),
-			Address2:     pubKey.Y.String(),
+			Amount: tx.Amounts[i],
+			Address: model.Address{
+				Address1: addr.Address1,
+				Address2: addr.Address2,
+			},
 			PreviousHash: hash,
 			Index:        uint(i),
 		}
 	}
 	// Create a change transaction if the sum of utxos exceeds want
 	if sum > want {
-		selfKey := keys[tx.From]
-		selfPubKey := &selfKey.PublicKey
 		change := model.Output{
-			Amount:       sum - want,
-			Address1:     selfPubKey.X.String(),
-			Address2:     selfPubKey.Y.String(),
+			Amount: sum - want,
+			Address: model.Address{
+				Address1: tx.From.Address1,
+				Address2: tx.From.Address2,
+			},
 			PreviousHash: hash,
 			Index:        uint(len(ops)),
 		}
@@ -296,19 +355,19 @@ func createJSONStr(tx simpleTx) (string, error) {
 	return jsonStr, nil
 }
 
+// FIXME: この構造体いらない？
 type genesisJSON struct {
 	Message string       `json:"message"`
 	Genesis model.Output `json:"genesis"`
 }
 
-func createGenesis(urls []string, owner int, amount int) {
-	priKey := keys[owner]
-	pubKey := &priKey.PublicKey
-
+func createGenesis(urls []string, owner model.Address, amount int) {
 	// Dummy signatures for genesis
 	sig := model.Signature{
-		Address1:   "gene",
-		Address2:   "sis",
+		Address: model.Address{
+			Address1: "gene",
+			Address2: "sis",
+		},
 		Signature1: "dum",
 		Signature2: "my",
 		OutputID:   1,
@@ -319,9 +378,11 @@ func createGenesis(urls []string, owner int, amount int) {
 	}
 
 	genesis := model.Output{
-		Amount:       amount,
-		Address1:     pubKey.X.String(),
-		Address2:     pubKey.Y.String(),
+		Amount: amount,
+		Address: model.Address{
+			Address1: owner.Address1,
+			Address2: owner.Address2,
+		},
 		PreviousHash: "genesis",
 		Index:        0,
 		Used:         false,
@@ -332,8 +393,8 @@ func createGenesis(urls []string, owner int, amount int) {
 	jsonStr := `
 	{
 		"amount": ` + strconv.Itoa(amount) + `,
-		"address1": "` + pubKey.X.String() + `",
-		"address2": "` + pubKey.Y.String() + `"
+		"address1": "` + owner.Address1 + `",
+		"address2": "` + owner.Address2 + `"
 	}`
 
 	// Create genesis records in servers
@@ -345,6 +406,7 @@ func createGenesis(urls []string, owner int, amount int) {
 		if err != nil {
 			log.Panicln(err)
 		}
+		log.Println(g.Message)
 	}
 }
 
@@ -362,8 +424,33 @@ func generateClients(num int) {
 	}
 }
 
-func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan bool) {
+// FIXME: サーバー側もstruct Addressを作ったらaddr1, addr2をまとめる
+func updateOutputs(outputs []model.Output, addr1, addr2, sig1, sig2 string) {
+	sigs := model.Signature{
+		Address: model.Address{
+			Address1: addr1,
+			Address2: addr2,
+		},
+		Signature1: sig1,
+		Signature2: sig2,
+	}
+	for _, output := range outputs {
+		// Make a record if the output is not created yet
+		c := 0
+		db.Where("address1 = ? AND address2 = ? AND previous_hash = ? AND output_index = ?",
+			output.Address1, output.Address2, output.PreviousHash, output.Index).
+			First(&output).Count(&c)
+		if c == 0 {
+			db.Create(&output)
+		}
+		sigs.OutputID = output.ID
+		db.Model(&output).Association("Signatures").Append(sigs)
+	}
+}
+
+func executeTxs(baseURLs []string, txs []generalTx) {
 	for i := 0; i < len(txs); i++ {
+		fmt.Printf("tx %d is executing\n", i)
 		jsonStr, err := createJSONStr(txs[i])
 		if err != nil {
 			log.Println(err)
@@ -372,47 +459,123 @@ func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan boo
 		// fmt.Println(jsonStr)
 
 		// FIXME: リクエストを送ってレスポンスを受け取る部分は並行処理の方がいい？
-		for j, baseURL := range baseURLs {
+		for _, baseURL := range baseURLs {
 			url := baseURL + "/transaction"
 			body := post(url, jsonStr)
+			// sendWs(baseURL, jsonStr)
 
 			response := model.Response{}
 			err := json.Unmarshal(body, &response)
 			if err != nil {
 				log.Panicln(err)
 			}
-			// fmt.Println(response)
 			fmt.Println("Message: " + response.Message)
-
-			outputs := response.Transaction.Outputs
-			sigs := model.Signature{
-				Address1:   response.Address1,
-				Address2:   response.Address2,
-				Signature1: response.Signature1.String(),
-				Signature2: response.Signature2.String(),
-			}
-			for _, output := range outputs {
-				// Make a record if the output is not created yet
-				if j == 0 {
-					db.Create(&output)
-				} else {
-					db.Where("address1 = ? AND address2 = ? AND previous_hash = ? AND output_index = ?",
-						output.Address1, output.Address2, output.PreviousHash, output.Index).
-						First(&output)
-				}
-				// Add a signature of server i
-				sigs.OutputID = output.ID
-				db.Model(&output).Association("Signatures").Append(sigs)
-			}
 		}
+
+		// FIXME: 全てのサーバーから署名が来るのを待つ
+		time.Sleep(time.Millisecond * 250)
+
+		// FIXME: 現実的にはずっと待ち続ける(実際はどれだけ待てばいいのか分からないため)
+		// for j := 0; j < n; j++ {
+		// 	<-received
+		// }
 	}
-	if async {
-		finished <- true
+}
+
+var conns = make(map[string]*websocket.Conn)
+
+// FIXME: unused now
+func sendWs(url, jsonStr string) {
+	url = strings.Replace(url, "http", "ws", -1) + "/ws"
+	conn := conns[url]
+	transaction := model.Transaction{}
+	err := json.Unmarshal([]byte(jsonStr), &transaction)
+	if err != nil {
+		log.Panicln(err)
 	}
+	err = conn.WriteJSON(transaction)
+	if err != nil {
+		log.Println("write:", err)
+		return
+	}
+}
+
+func setupWs(baseURLs []string) {
+	for _, baseURL := range baseURLs {
+		url := strings.Replace(baseURL, "http", "ws", -1) + "/ws"
+		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+		if err != nil {
+			log.Fatal("dial:", err)
+		}
+		conns[url] = conn
+
+		// Send the addresses of this cluster to a server
+		addrs := make([]model.Address, len(keys))
+		for i, key := range keys {
+			pub := &key.PublicKey
+			addrs[i].Address1 = pub.X.String()
+			addrs[i].Address2 = pub.Y.String()
+		}
+		conn.WriteJSON(addrs)
+
+		resp := model.Response{}
+		err = conn.ReadJSON(&resp)
+		if err != nil {
+			log.Println("cluster:", err)
+			return
+		}
+		addr := conn.RemoteAddr().String()
+		log.Printf("recv in %s: %s", addr, resp.Message)
+
+		// Receive transactions whose outputs include addresses of this cluster
+		go func() {
+			for {
+				response := model.Response{}
+				err := conn.ReadJSON(&response)
+				if err != nil {
+					log.Println("read:", err)
+					return
+				}
+
+				outputs := response.Transaction.Outputs
+				addr1 := response.Address1
+				addr2 := response.Address2
+				sig1 := response.Signature1.String()
+				sig2 := response.Signature2.String()
+				updateOutputs(outputs, addr1, addr2, sig1, sig2)
+
+				addr := conn.RemoteAddr().String()
+				log.Printf("recv in %s:\n%v\n", addr, response)
+
+				// received <- true
+			}
+		}()
+	}
+}
+
+type respAddrs struct {
+	Message string          `json:"message"`
+	Addrs   []model.Address `json:"addresses"`
+}
+
+// Get all addresses of all clusters (including this cluster)
+func getAddrs(baseURL string) []model.Address {
+	url := baseURL + "/address"
+	body := get(url)
+
+	response := respAddrs{}
+	err := json.Unmarshal(body, &response)
+	if err != nil {
+		log.Panicln(err)
+	}
+	log.Printf("Message: %s\n", response.Message)
+
+	return response.Addrs
 }
 
 var db *gorm.DB
 
+// FIXME: DBに秘密鍵と公開鍵を保存する
 var keys []*ecdsa.PrivateKey
 
 // Get a private key from a public key (PublicKey.X + PublicKey.Y)
@@ -422,7 +585,10 @@ var pub2Pri map[string]*ecdsa.PrivateKey
 const n = 2
 
 // For mutual exclusion of db
-var c chan bool
+var c = make(chan bool, 1)
+
+// For synchronization of communication with servers
+var received = make(chan bool, 200)
 
 func main() {
 	baseURLs := []string{
@@ -431,136 +597,135 @@ func main() {
 		// "http://localhost:8082",
 		// "http://localhost:8083",
 	}
-	db = initDB()
+
+	fmt.Printf("Input client number: ")
+	var num int
+	fmt.Scan(&num)
+	db = initDB(num)
 	defer db.Close()
 
 	// Generate private keys
 	const numClients = 4
 	generateClients(numClients)
 
-	// Make a genesis transaction
-	createGenesis(baseURLs, 0, 200)
+	setupWs(baseURLs)
 
-	c = make(chan bool, 1)
+	fmt.Println("Have all clusters been registered by servers?")
+	var dummy string
+	fmt.Scan(&dummy)
+
+	addrs := getAddrs(baseURLs[0])
+	log.Println(addrs)
+
+	// Make a genesis transaction
+L_FOR:
+	for {
+		fmt.Println("Have a genesis?")
+		fmt.Println("1. yes")
+		fmt.Println("2. no")
+		var g int
+		fmt.Scan(&g)
+		switch g {
+		case 1:
+			owner := addrs[0]
+			createGenesis(baseURLs, owner, 200)
+			break L_FOR
+		case 2:
+			break L_FOR
+		default:
+			fmt.Println("Please input valid number.")
+		}
+	}
+
+	// Can make transactions between different clusters with generalTxs
+	// one cluster
+	// atxs1 := []generalTx{
+	// 	{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{200}},
+	// }
+
+	// two clusters
+	// atxs1 := []generalTx{
+	// 	{From: addrs[0], To: []model.Address{addrs[4]}, Amounts: []int{200}},
+	// 	// {From: addrs[4], To: []model.Address{addrs[0]}, Amounts: []int{200}},
+	// }
+
+	// two clusters
+	atxs1 := []generalTx{
+		{From: addrs[0], To: []model.Address{addrs[0], addrs[4]}, Amounts: []int{100, 100}},
+	}
+	for i := 0; i < 10; i++ {
+		tx := generalTx{From: addrs[0], To: []model.Address{addrs[4]}, Amounts: []int{10}}
+		// tx := generalTx{From: addrs[4], To: []model.Address{addrs[0]}, Amounts: []int{10}}
+		atxs1 = append(atxs1, tx)
+	}
+
+	executeTxs(baseURLs, atxs1)
 
 	// Make sample transactions
 	// case 1: 0 -> 1
-	// txs1 := []simpleTx{
+	// itxs1 := []insideTx{
 	// 	{From: 0, To: []int{1}, Amounts: []int{200}},
 	// }
-	// executeTxs(baseURLs, txs1, false, nil)
+	// atxs1 := convertInsideTxs(itxs1)
+	// executeTxs(baseURLs, atxs1)
 
 	// case 2: 0 <-> 1
-	// tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{200}}
-	// tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{200}}
-	// txs1 := []simpleTx{}
+	// tx1 := insideTx{From: 0, To: []int{1}, Amounts: []int{200}}
+	// tx2 := insideTx{From: 1, To: []int{0}, Amounts: []int{200}}
+	// itxs1 := []insideTx{}
 	// for i := 0; i < 10; i++ {
-	// 	txs1 = append(txs1, tx1)
-	// 	txs1 = append(txs1, tx2)
+	// 	itxs1 = append(itxs1, tx1)
+	// 	itxs1 = append(itxs1, tx2)
 	// }
-	// executeTxs(baseURLs, txs1, false, nil)
+	// atxs1 := convertInsideTxs(itxs1)
+	// executeTxs(baseURLs, atxs1)
 
 	// case 3: 0 <-> 1 & 2 <-> 3 (parallelly)
-	// finished := make(chan bool)
+	// tx0 := insideTx{From: 0, To: []int{0, 2}, Amounts: []int{50, 150}}
+	// itxs0 := []insideTx{}
+	// itxs0 = append(itxs0, tx0)
+	// atxs0 := convertInsideTxs(itxs0)
+	// executeTxs(baseURLs, atxs0)
 	//
-	// tx0 := simpleTx{From: 0, To: []int{0, 2}, Amounts: []int{50, 150}}
-	// txs0 := []simpleTx{}
-	// txs0 = append(txs0, tx0)
-	// executeTxs(baseURLs, txs0, false, nil)
-	//
-	// tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{50}}
-	// tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{50}}
-	// tx3 := simpleTx{From: 2, To: []int{3}, Amounts: []int{150}}
-	// tx4 := simpleTx{From: 3, To: []int{2}, Amounts: []int{150}}
-	// txs1 := []simpleTx{}
-	// txs2 := []simpleTx{}
+	// tx1 := insideTx{From: 0, To: []int{1}, Amounts: []int{50}}
+	// tx2 := insideTx{From: 1, To: []int{0}, Amounts: []int{50}}
+	// itxs1 := []insideTx{}
 	// for i := 0; i < 10; i++ {
-	// 	txs1 = append(txs1, tx1)
-	// 	txs1 = append(txs1, tx2)
-	// 	txs2 = append(txs2, tx3)
-	// 	txs2 = append(txs2, tx4)
+	// 	itxs1 = append(itxs1, tx1)
+	// 	itxs1 = append(itxs1, tx2)
 	// }
+	// atxs1 := convertInsideTxs(itxs1)
+	// executeTxs(baseURLs, atxs1)
 	//
-	// go executeTxs(baseURLs, txs1, true, finished)
-	// go executeTxs(baseURLs, txs2, true, finished)
-	// <-finished
-	// <-finished
-
-	// case 4.1: 0 <-> 1 & 1 <-> 2 & 2 <-> 3 & 3 <-> 0 (parallelly)
-	// finished := make(chan bool)
-	//
-	// tx0 := simpleTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
-	// txs0 := []simpleTx{}
-	// txs0 = append(txs0, tx0)
-	// executeTxs(baseURLs, txs0, false, nil)
-	//
-	// tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{50}}
-	// tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{50}}
-	// tx3 := simpleTx{From: 1, To: []int{2}, Amounts: []int{50}}
-	// tx4 := simpleTx{From: 2, To: []int{1}, Amounts: []int{50}}
-	// tx5 := simpleTx{From: 2, To: []int{3}, Amounts: []int{50}}
-	// tx6 := simpleTx{From: 3, To: []int{2}, Amounts: []int{50}}
-	// tx7 := simpleTx{From: 3, To: []int{0}, Amounts: []int{50}}
-	// tx8 := simpleTx{From: 0, To: []int{3}, Amounts: []int{50}}
-	// txs1 := []simpleTx{}
-	// txs2 := []simpleTx{}
-	// txs3 := []simpleTx{}
-	// txs4 := []simpleTx{}
-	// for i := 0; i < 25; i++ {
-	// 	txs1 = append(txs1, tx1)
-	// 	txs1 = append(txs1, tx2)
-	// 	txs2 = append(txs2, tx3)
-	// 	txs2 = append(txs2, tx4)
-	// 	txs3 = append(txs3, tx5)
-	// 	txs3 = append(txs3, tx6)
-	// 	txs4 = append(txs4, tx7)
-	// 	txs4 = append(txs4, tx8)
+	// tx3 := insideTx{From: 2, To: []int{3}, Amounts: []int{150}}
+	// tx4 := insideTx{From: 3, To: []int{2}, Amounts: []int{150}}
+	// itxs2 := []insideTx{}
+	// for i := 0; i < 10; i++ {
+	// 	itxs2 = append(itxs2, tx3)
+	// 	itxs2 = append(itxs2, tx4)
 	// }
-	//
-	// go executeTxs(baseURLs, txs1, true, finished)
-	// go executeTxs(baseURLs, txs2, true, finished)
-	// go executeTxs(baseURLs, txs3, true, finished)
-	// go executeTxs(baseURLs, txs4, true, finished)
-	// <-finished
-	// <-finished
-	// <-finished
-	// <-finished
+	// atxs2 := convertInsideTxs(itxs2)
+	// executeTxs(baseURLs, atxs2)
 
-	// case 4.2: 0 <-> 1 & 0 <-> 1 (parallelly)
-	// finished := make(chan bool)
-	//
-	// tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{100}}
-	// tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{100}}
-	// tx3 := simpleTx{From: 0, To: []int{1}, Amounts: []int{100}}
-	// tx4 := simpleTx{From: 1, To: []int{0}, Amounts: []int{100}}
-	// txs1 := []simpleTx{}
-	// txs2 := []simpleTx{}
-	// for i := 0; i < 25; i++ {
-	// 	txs1 = append(txs1, tx1)
-	// 	txs1 = append(txs1, tx2)
-	// 	txs2 = append(txs2, tx3)
-	// 	txs2 = append(txs2, tx4)
-	// }
-	//
-	// go executeTxs(baseURLs, txs1, true, finished)
-	// go executeTxs(baseURLs, txs2, true, finished)
-	// <-finished
-	// <-finished
-
-	// case 5: random -> random
+	// case 4: random -> random
 	mrand.Seed(time.Now().UnixNano())
-	tx0 := simpleTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
-	txs0 := []simpleTx{}
-	txs0 = append(txs0, tx0)
-	executeTxs(baseURLs, txs0, false, nil)
+	// tx0 := insideTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
+	// itxs0 := []insideTx{}
+	// itxs0 = append(itxs0, tx0)
+	// atxs0 := convertInsideTxs(itxs0)
+	// executeTxs(baseURLs, atxs0)
+	//
+	// itxs1 := []insideTx{}
+	// for i := 0; i < 25; i++ {
+	// 	from := mrand.Intn(4)
+	// 	to := mrand.Intn(4)
+	// 	tx1 := insideTx{From: from, To: []int{to}, Amounts: []int{1}}
+	// 	itxs1 = append(itxs1, tx1)
+	// }
+	// atxs1 := convertInsideTxs(itxs1)
+	// executeTxs(baseURLs, atxs1)
 
-	txs1 := []simpleTx{}
-	for i := 0; i < 25; i++ {
-		from := mrand.Intn(4)
-		to := mrand.Intn(4)
-		tx1 := simpleTx{From: from, To: []int{to}, Amounts: []int{1}}
-		txs1 = append(txs1, tx1)
+	// Wait for receiving outputs of this cluster
+	for {
 	}
-
-	executeTxs(baseURLs, txs1, false, nil)
 }

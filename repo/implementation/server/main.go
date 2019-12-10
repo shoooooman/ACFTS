@@ -22,6 +22,7 @@ func initDB(port int) *gorm.DB {
 	}
 
 	db.AutoMigrate(&model.Output{})
+	db.AutoMigrate(&model.Client{})
 
 	return db
 }
@@ -31,6 +32,8 @@ func initRoute(db *gorm.DB) *gin.Engine {
 
 	// APIs
 	r.GET("/", api.Ping())
+	r.GET("/ws", api.WsHandler(db))
+	r.GET("/address", api.GetAddresses(db))
 	r.POST("/genesis", api.CreateGenesis(db))
 	r.POST("/transaction", api.VerifyTransaction(db, n))
 
