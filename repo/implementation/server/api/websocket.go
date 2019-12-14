@@ -28,6 +28,7 @@ func WsHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 		// defer conn.Close()
 		conns[clusterID] = conn
+		log.Printf("conns[%d] is updated: %v\n", clusterID, conn.RemoteAddr().String())
 
 		// Register addresses of clients
 		clients := []model.Client{}

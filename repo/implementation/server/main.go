@@ -13,7 +13,7 @@ import (
 )
 
 // n is the number of servers
-const n = 2
+const n = 4
 
 func initDB(port int) *gorm.DB {
 	db, err := gorm.Open("mysql", "root:@tcp(127.0.0.1:3306)/acfts_"+strconv.Itoa(port)+"?charset=utf8&parseTime=True&loc=Local")
@@ -36,6 +36,7 @@ func initRoute(db *gorm.DB) *gin.Engine {
 	r.GET("/address", api.GetAddresses(db))
 	r.POST("/genesis", api.CreateGenesis(db))
 	r.POST("/transaction", api.VerifyTransaction(db, n))
+	r.DELETE("/all", api.DeleteAll(db))
 
 	return r
 }

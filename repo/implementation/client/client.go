@@ -38,6 +38,14 @@ func initDB(num int) *gorm.DB {
 	return db
 }
 
+// DeleteAll deletes all data in DB
+func DeleteAll(db *gorm.DB) {
+	output := model.Output{}
+	signature := model.Signature{}
+	db.Unscoped().Delete(&output)
+	db.Unscoped().Delete(&signature)
+}
+
 func get(url string) []byte {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -59,7 +67,8 @@ func get(url string) []byte {
 	return body
 }
 
-func post(url, jsonStr string) []byte {
+// Do post request asynchronously
+func post(url, jsonStr string, b chan []byte) {
 	req, err := http.NewRequest(
 		"POST",
 		url,
@@ -83,6 +92,28 @@ func post(url, jsonStr string) []byte {
 		log.Panic(err)
 	}
 
+	b <- body
+}
+
+// Delete all data in database
+func _delete(url string) []byte {
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Panicln(err)
+	}
+
 	return body
 }
 
@@ -97,7 +128,11 @@ func getClientSig(utxo model.Output) (string, string) {
 
 	// Get signature using ellipse curve cryptography
 	pub := utxo.Address1 + utxo.Address2
-	r, s, err := ecdsa.Sign(rand.Reader, pub2Pri[pub], hashed)
+	pri, ok := pub2Pri[pub]
+	if !ok {
+		log.Panicf("A public key %s is not in this cluster.\n", pub)
+	}
+	r, s, err := ecdsa.Sign(rand.Reader, pri, hashed)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -398,9 +433,15 @@ func createGenesis(urls []string, owner model.Address, amount int) {
 	}`
 
 	// Create genesis records in servers
+	b := make(chan []byte, n)
 	for _, baseURL := range urls {
 		url := baseURL + "/genesis"
-		body := post(url, jsonStr)
+		go post(url, jsonStr, b)
+	}
+
+	// Wait for responses from all servers
+	for i := 0; i < n; i++ {
+		body := <-b
 		var g genesisJSON
 		err := json.Unmarshal(body, &g)
 		if err != nil {
@@ -435,22 +476,26 @@ func updateOutputs(outputs []model.Output, addr1, addr2, sig1, sig2 string) {
 		Signature2: sig2,
 	}
 	for _, output := range outputs {
+		// For mutual exclusion of db
+		c <- true
+
 		// Make a record if the output is not created yet
-		c := 0
+		cnt := 0
 		db.Where("address1 = ? AND address2 = ? AND previous_hash = ? AND output_index = ?",
 			output.Address1, output.Address2, output.PreviousHash, output.Index).
-			First(&output).Count(&c)
-		if c == 0 {
+			First(&output).Count(&cnt)
+		if cnt == 0 {
 			db.Create(&output)
 		}
 		sigs.OutputID = output.ID
 		db.Model(&output).Association("Signatures").Append(sigs)
+
+		<-c
 	}
 }
 
 func executeTxs(baseURLs []string, txs []generalTx) {
 	for i := 0; i < len(txs); i++ {
-		fmt.Printf("tx %d is executing\n", i)
 		jsonStr, err := createJSONStr(txs[i])
 		if err != nil {
 			log.Println(err)
@@ -458,27 +503,30 @@ func executeTxs(baseURLs []string, txs []generalTx) {
 		}
 		// fmt.Println(jsonStr)
 
-		// FIXME: リクエストを送ってレスポンスを受け取る部分は並行処理の方がいい？
+		// Send requests to all servers
+		b := make(chan []byte, n)
 		for _, baseURL := range baseURLs {
 			url := baseURL + "/transaction"
-			body := post(url, jsonStr)
+			go post(url, jsonStr, b)
 			// sendWs(baseURL, jsonStr)
+		}
 
+		// Wait for responses from all servers
+		for j := 0; j < n; j++ {
+			body := <-b
 			response := model.Response{}
 			err := json.Unmarshal(body, &response)
 			if err != nil {
 				log.Panicln(err)
 			}
-			fmt.Println("Message: " + response.Message)
+			log.Println("Message: " + response.Message)
 		}
 
-		// FIXME: 全てのサーバーから署名が来るのを待つ
-		time.Sleep(time.Millisecond * 250)
-
 		// FIXME: 現実的にはずっと待ち続ける(実際はどれだけ待てばいいのか分からないため)
-		// for j := 0; j < n; j++ {
-		// 	<-received
-		// }
+		// 自分に関係あるutxoのみを受け取るが，それらがどれだけあるかは分からない
+		for j := 0; j < n; j++ {
+			<-received
+		}
 	}
 }
 
@@ -507,6 +555,7 @@ func setupWs(baseURLs []string) {
 		if err != nil {
 			log.Fatal("dial:", err)
 		}
+		log.Printf("websocket: connected with %v", conn.RemoteAddr().String())
 		conns[url] = conn
 
 		// Send the addresses of this cluster to a server
@@ -533,6 +582,7 @@ func setupWs(baseURLs []string) {
 				response := model.Response{}
 				err := conn.ReadJSON(&response)
 				if err != nil {
+					log.Printf("websocket error in client with %v\n", conn.RemoteAddr().String())
 					log.Println("read:", err)
 					return
 				}
@@ -547,7 +597,7 @@ func setupWs(baseURLs []string) {
 				addr := conn.RemoteAddr().String()
 				log.Printf("recv in %s:\n%v\n", addr, response)
 
-				// received <- true
+				received <- true
 			}
 		}()
 	}
@@ -582,7 +632,7 @@ var keys []*ecdsa.PrivateKey
 var pub2Pri map[string]*ecdsa.PrivateKey
 
 // n is the number of servers
-const n = 2
+const n = 4
 
 // For mutual exclusion of db
 var c = make(chan bool, 1)
@@ -594,8 +644,8 @@ func main() {
 	baseURLs := []string{
 		"http://localhost:8080",
 		"http://localhost:8081",
-		// "http://localhost:8082",
-		// "http://localhost:8083",
+		"http://localhost:8082",
+		"http://localhost:8083",
 	}
 
 	fmt.Printf("Input client number: ")
@@ -610,7 +660,7 @@ func main() {
 
 	setupWs(baseURLs)
 
-	fmt.Println("Have all clusters been registered by servers?")
+	fmt.Println("Input something when all clusters have been registered by all servers.")
 	var dummy string
 	fmt.Scan(&dummy)
 
@@ -643,23 +693,30 @@ L_FOR:
 	// 	{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{200}},
 	// }
 
+	atxs1 := make([]generalTx, 200)
+	tx := generalTx{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{1}}
+	for i := 0; i < 200; i++ {
+		atxs1[i] = tx
+	}
+	executeTxs(baseURLs, atxs1)
+
 	// two clusters
 	// atxs1 := []generalTx{
 	// 	{From: addrs[0], To: []model.Address{addrs[4]}, Amounts: []int{200}},
 	// 	// {From: addrs[4], To: []model.Address{addrs[0]}, Amounts: []int{200}},
 	// }
+	// executeTxs(baseURLs, atxs1)
 
 	// two clusters
-	atxs1 := []generalTx{
-		{From: addrs[0], To: []model.Address{addrs[0], addrs[4]}, Amounts: []int{100, 100}},
-	}
-	for i := 0; i < 10; i++ {
-		tx := generalTx{From: addrs[0], To: []model.Address{addrs[4]}, Amounts: []int{10}}
-		// tx := generalTx{From: addrs[4], To: []model.Address{addrs[0]}, Amounts: []int{10}}
-		atxs1 = append(atxs1, tx)
-	}
-
-	executeTxs(baseURLs, atxs1)
+	// atxs1 := []generalTx{
+	// 	{From: addrs[0], To: []model.Address{addrs[0], addrs[4]}, Amounts: []int{100, 100}},
+	// }
+	// for i := 0; i < 10; i++ {
+	// 	tx := generalTx{From: addrs[0], To: []model.Address{addrs[4]}, Amounts: []int{10}}
+	// 	// tx := generalTx{From: addrs[4], To: []model.Address{addrs[0]}, Amounts: []int{10}}
+	// 	atxs1 = append(atxs1, tx)
+	// }
+	// executeTxs(baseURLs, atxs1)
 
 	// Make sample transactions
 	// case 1: 0 -> 1
