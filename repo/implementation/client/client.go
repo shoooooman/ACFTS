@@ -38,14 +38,6 @@ func initDB(num int) *gorm.DB {
 	return db
 }
 
-// DeleteAll deletes all data in DB
-func DeleteAll(db *gorm.DB) {
-	output := model.Output{}
-	signature := model.Signature{}
-	db.Unscoped().Delete(&output)
-	db.Unscoped().Delete(&signature)
-}
-
 func get(url string) []byte {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

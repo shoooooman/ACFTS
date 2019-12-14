@@ -6,14 +6,24 @@ import (
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/jinzhu/gorm"
 )
+
+// delete all data in DB
+func deleteAll(db *gorm.DB) {
+	output := model.Output{}
+	signature := model.Signature{}
+	db.Unscoped().Delete(&output)
+	db.Unscoped().Delete(&signature)
+}
 
 func benchmarkSetup(serverURLs []string, numClients int, genesisOwner int) []model.Address {
 	db = initDB(0)
 	// db = initDB(3)
 
 	// Delete all data in a client
-	DeleteAll(db)
+	deleteAll(db)
 
 	// Delete all data in servers
 	for _, serverURL := range serverURLs {
