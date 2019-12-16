@@ -10,5 +10,5 @@ type Output struct {
 	PreviousHash string      `json:"previous_hash"`
 	Index        uint        `json:"index" gorm:"column:output_index"`
 	Used         bool        `json:"used"`
-	Signatures   []Signature `gorm:"foreignkey:OutputID"`
+	Signatures   []Signature `json:"server_signatures" gorm:"foreignkey:OutputID"`
 }

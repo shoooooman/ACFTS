@@ -4,10 +4,14 @@ import (
 	"acfts/api"
 	"acfts/db/model"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
@@ -22,7 +26,6 @@ func initDB(port int) *gorm.DB {
 	}
 
 	db.AutoMigrate(&model.Output{})
-	db.AutoMigrate(&model.Client{})
 
 	return db
 }
@@ -32,8 +35,6 @@ func initRoute(db *gorm.DB) *gin.Engine {
 
 	// APIs
 	r.GET("/", api.Ping())
-	r.GET("/ws", api.WsHandler(db))
-	r.GET("/address", api.GetAddresses(db))
 	r.POST("/genesis", api.CreateGenesis(db))
 	r.POST("/transaction", api.VerifyTransaction(db, n))
 	r.DELETE("/all", api.DeleteAll(db))
@@ -48,6 +49,10 @@ func main() {
 
 	db := initDB(port)
 	defer db.Close()
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:8000", nil))
+	}()
 
 	r := initRoute(db)
 	r.Run(":" + strconv.Itoa(port))

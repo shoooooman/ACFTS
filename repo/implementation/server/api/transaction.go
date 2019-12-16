@@ -311,46 +311,21 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 		tx.Commit()
 
 		// Add records of outputs
-		// and collect conns of the receivers whose cluster id is diffrent from one of the sender
-		related := make(map[uint]bool)
 		for i, output := range outputs {
 			db.Create(&output)
 			transaction.Outputs[i] = output
-
-			receiver := model.Client{}
-			raddr1 := output.Address1
-			raddr2 := output.Address2
-			db.Where("address1 = ? AND address2 = ?", raddr1, raddr2).First(&receiver)
-			log.Printf("The cluster ID of output is %d\n", receiver.ClusterID)
-			related[receiver.ClusterID] = true
 		}
 
 		r, s := createSignature(transaction)
 		simpleTx := convertTransaction(transaction)
 
-		obj := gin.H{
+		c.JSON(http.StatusCreated, gin.H{
 			"message":     "Verified this transaction.",
 			"transaction": simpleTx,
 			"address1":    (&key.PublicKey).X.String(),
 			"address2":    (&key.PublicKey).Y.String(),
 			"signature1":  r,
 			"signature2":  s,
-		}
-
-		// Send transactions to the clients whose clusters are different from the one of the input
-		for cid := range related {
-			conn := conns[int(cid)]
-			err := conn.WriteJSON(obj)
-			if err != nil {
-				log.Println("write:", err)
-				break
-			}
-			addr := conn.RemoteAddr().String()
-			log.Printf("write to %s\n", addr)
-		}
-
-		c.JSON(http.StatusCreated, gin.H{
-			"message": "A transaction is verified.",
 		})
 	}
 }

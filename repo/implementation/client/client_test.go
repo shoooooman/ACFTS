@@ -2,47 +2,70 @@ package main
 
 import (
 	"acfts-client/model"
+	"fmt"
 	"log"
 	"math/rand"
+	"strconv"
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/braintree/manners"
 )
 
-// delete all data in DB
-func deleteAll(db *gorm.DB) {
-	output := model.Output{}
-	signature := model.Signature{}
-	db.Unscoped().Delete(&output)
-	db.Unscoped().Delete(&signature)
-}
+func benchmarkSetup(srvURLs []string, numClusters, numClients, gOwner int) []model.Address {
+	// fmt.Printf("Input client number: ")
+	// var num int
+	// fmt.Scan(&num)
+	//
+	// fmt.Println("before: " + strconv.Itoa(num)) // 0
 
-func benchmarkSetup(serverURLs []string, numClients int, genesisOwner int) []model.Address {
-	db = initDB(0)
-	// db = initDB(3)
+	num := 0
+	db = initDB(num)
 
 	// Delete all data in a client
 	deleteAll(db)
 
 	// Delete all data in servers
-	for _, serverURL := range serverURLs {
+	for _, serverURL := range srvURLs {
 		url := serverURL + "/all"
 		body := _delete(url)
 		log.Printf("Delete: %v\n", string(body))
 	}
 
+	const basePort = 3000
+	port := basePort + num
+	cBase := "http://localhost"
+
 	// Generate private keys
-	generateClients(numClients)
+	myurl := cBase + ":" + strconv.Itoa(port)
+	generateClients(numClients, myurl)
 
-	setupWs(serverURLs)
+	// Use manners to stop the server every scenaio
+	r := initRoute(db)
+	go manners.ListenAndServe(":"+strconv.Itoa(port), r)
 
-	addrs := getAddrs(serverURLs[0])
+	otherClients := getOtherCURLs(cBase, numClusters, num)
+	fmt.Println("other clients")
+	fmt.Println(otherClients)
+
+	for _, other := range otherClients {
+		url := other + "/output"
+		body := _delete(url)
+		log.Printf("Delete: %v\n", string(body))
+	}
+
+	// fmt.Println("Input something when all clusters have been registered by all servers.")
+	// var dummy string
+	// fmt.Scan(&dummy)
+
+	collectOtherAddrs(otherClients)
+
+	addrs := getAllAddrs()
 	log.Println(addrs)
 
 	// Make a genesis transaction
-	owner := addrs[genesisOwner]
-	createGenesis(serverURLs, owner, 1000000)
+	owner := addrs[gOwner]
+	createGenesis(srvURLs, owner, 1000000)
 
 	return addrs
 }
@@ -56,7 +79,7 @@ func BenchmarkScenario1(b *testing.B) {
 		"http://localhost:8083",
 	}
 
-	addrs := benchmarkSetup(serverURLs, 4, 0)
+	addrs := benchmarkSetup(serverURLs, 1, 4, 0)
 	defer db.Close()
 
 	atxs1 := []generalTx{
@@ -68,6 +91,8 @@ func BenchmarkScenario1(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		executeTxs(serverURLs, atxs1)
 	}
+
+	manners.Close()
 }
 
 // Scenario2: 0 <-> 1
@@ -79,7 +104,7 @@ func BenchmarkScenario2(b *testing.B) {
 		"http://localhost:8083",
 	}
 
-	addrs := benchmarkSetup(serverURLs, 4, 0)
+	addrs := benchmarkSetup(serverURLs, 1, 4, 0)
 	defer db.Close()
 
 	atxs1 := []generalTx{
@@ -94,6 +119,8 @@ func BenchmarkScenario2(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		executeTxs(serverURLs, atxs1)
 	}
+
+	manners.Close()
 }
 
 // Scenario3: 0 <-> 1, 2 <-> 3
@@ -105,7 +132,7 @@ func BenchmarkScenario3(b *testing.B) {
 		"http://localhost:8083",
 	}
 
-	addrs := benchmarkSetup(serverURLs, 4, 0)
+	addrs := benchmarkSetup(serverURLs, 1, 4, 0)
 	defer db.Close()
 
 	atx := generalTx{
@@ -127,6 +154,8 @@ func BenchmarkScenario3(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		executeTxs(serverURLs, atxs1)
 	}
+
+	manners.Close()
 }
 
 // Scenario4: random -> random
@@ -138,7 +167,7 @@ func BenchmarkScenario4(b *testing.B) {
 		"http://localhost:8083",
 	}
 
-	addrs := benchmarkSetup(serverURLs, 4, 0)
+	addrs := benchmarkSetup(serverURLs, 1, 4, 0)
 	defer db.Close()
 
 	atx := generalTx{
@@ -163,27 +192,31 @@ func BenchmarkScenario4(b *testing.B) {
 
 		executeTxs(serverURLs, atxs1)
 	}
+
+	manners.Close()
 }
 
-// Scenario5: 4 -> 0
-// func BenchmarkScenario5(b *testing.B) {
-// 	serverURLs := []string{
-// 		// "http://localhost:8080",
-// 		// "http://localhost:8081",
-// 		"http://localhost:8082",
-// 		"http://localhost:8083",
-// 	}
-//
-// 	addrs := benchmarkSetup(serverURLs, 4, 4)
-// 	defer db.Close()
-//
-// 	atxs1 := []generalTx{
-// 		{From: addrs[4], To: []model.Address{addrs[0]}, Amounts: []int{1}},
-// 	}
-//
-// 	b.ResetTimer()
-//
-// 	for i := 0; i < b.N; i++ {
-// 		executeTxs(serverURLs, atxs1)
-// 	}
-// }
+// Scenario5: 0 -> 4
+func BenchmarkScenario5(b *testing.B) {
+	serverURLs := []string{
+		"http://localhost:8080",
+		"http://localhost:8081",
+		"http://localhost:8082",
+		"http://localhost:8083",
+	}
+
+	addrs := benchmarkSetup(serverURLs, 2, 4, 0)
+	defer db.Close()
+
+	atxs1 := []generalTx{
+		{From: addrs[0], To: []model.Address{addrs[4]}, Amounts: []int{1}},
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		executeTxs(serverURLs, atxs1)
+	}
+
+	manners.Close()
+}

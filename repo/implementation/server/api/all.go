@@ -2,9 +2,9 @@ package api
 
 import (
 	"acfts/db/model"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
 )
 
@@ -12,21 +12,10 @@ import (
 func DeleteAll(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		output := model.Output{}
-		client := model.Client{}
-		db.Unscoped().Delete(&output)
-		db.Unscoped().Delete(&client)
+		db.DropTable(&output)
+		db.AutoMigrate(&output)
 
-		conns = make(map[int]*websocket.Conn)
-		clusterID = 0
-
-		// For benchmarking of transactions between clusters
-		// db.Unscoped().Where("cluster_id > 0").Delete(&client)
-		// conn0 := conns[0]
-		// clusterID = 1
-		// conns = make(map[int]*websocket.Conn)
-		// conns[0] = conn0
-
-		c.JSON(200, gin.H{
+		c.JSON(http.StatusOK, gin.H{
 			"message": "all data is deleted.",
 		})
 	}
