@@ -310,17 +310,18 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 		}
 		tx.Commit()
 
+		// Add records of outputs
 		for i, output := range outputs {
 			db.Create(&output)
 			transaction.Outputs[i] = output
 		}
 
 		r, s := createSignature(transaction)
+		simpleTx := convertTransaction(transaction)
 
-		json := convertTransaction(transaction)
 		c.JSON(http.StatusCreated, gin.H{
 			"message":     "Verified this transaction.",
-			"transaction": json,
+			"transaction": simpleTx,
 			"address1":    (&key.PublicKey).X.String(),
 			"address2":    (&key.PublicKey).Y.String(),
 			"signature1":  r,
