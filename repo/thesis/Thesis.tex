@@ -220,7 +220,7 @@ Clients also can send messages to the other clients through the HTTP protocol
 to notice new UTXOs that are owned by them.
 Therefore, clients also keep waiting for HTTP requests as well as servers.
 
-Both servers and clients have their database to record transaction outputs.
+Both servers and clients have relational database to record transaction outputs.
 The genesis is initially recorded in the client who has it
 and servers approve the transaction whose input is the genesis without conditions.
 
@@ -228,7 +228,7 @@ and servers approve the transaction whose input is the genesis without condition
 
 \section{Documentations}
 
-\subsection{Signature}
+\subsection{Address and signature}
 ACFTS uses public-key cryptography to show ownership of outputs
 and prove that transactions are approved by servers.
 The implementation adopts the Elliptic Curve Digital Signature Algorithm (ECDSA)
@@ -241,7 +241,7 @@ and signs the UTXOs with a private key which is also generated with ECDSA by the
 The receiver of the transaction can verify the signatures of servers
 with the public keys of the servers.
 
-\subsubsection{UTXO hash}
+\subsection{Identification of UTXO}
 A UTXO has an address, a hash of outputs of the previous transaction and an index in siblings.
 We show that UTXOs can be identified with these keys.
 
@@ -285,38 +285,39 @@ The system is implemented in Go and was benchmarked in a local environment.
 The benchmarking has been performed on a laptop with Intel Core i5 3.1GHz CPU and 16GB RAM.
 We do not assume network delay.
 
-We also profiled the system to find bottlenecks aiming for improving the throughputs.
+We also profiled the system to find bottlenecks.
 
-\section{Environments}
+\section{Design}
 \begin{itemize}
     \item The number of servers: 4
-    \item The number of clusters: 2 ($cs0$ and $cs1$)
-    \item The number of clients in each cluseter: 4\\
-        ($\{ct0, ct1, ct2, ct3\} \in cs0$ and $\{ct4, ct5, ct6, ct7\} \in cs1$)
-    \item The genesis: $amount = 1000000$, $owner = cs0$
+    \item The number of clients (clusters): 2 ($c_0$ and $c_1$)
+    \item The number of addresses in each client: 4\\
+        ($\{a_0, a_1, a_2, a_3\} \in c_0$ and $\{ct4, ct5, ct6, ct7\} \in c_1$)
+    \item The genesis: $amount = 1000000$, $owner = c_0$
 \end{itemize}
 
-We executed the following five diffrent scenarios.
-Every arrow indicates transfer of one amount of cryptocurrency.
+We executed the following five different scenarios.
+Every arrow indicates a transfer of 1 amount of cryptocurrency.
 \begin{itemize}
-    \item Scenario1: $ct0 \rightarrow ct1$
-    \item Scenario2: $ct0 \rightarrow ct1$, $ct1 \rightarrow ct0$
-    \item Scenario3: $ct0 \rightarrow ct1$, $ct1 \rightarrow ct0$, $ct2 \rightarrow ct3$, $ct3 \rightarrow ct2$
-    \item Scenario4: $random \rightarrow random~(rondom \in cs0)$
-    \item Scenario5: $ct0 \rightarrow ct4$
+    \item Scenario1: $a_0 \rightarrow a_1$
+    \item Scenario2: $a_0 \rightarrow a_1$, $a_1 \rightarrow a_0$
+    \item Scenario3: $a_0 \rightarrow a_1$, $a_1 \rightarrow a_0$, $a_2 \rightarrow a_3$, $a_3 \rightarrow a_2$
+    \item Scenario4: $random \rightarrow random~(rondom \in c_0)$
+    \item Scenario5: $a_0 \rightarrow ct4$
 \end{itemize}
-Note that sender and receiver are chosen from $cs0$ with equal probability in scenario4.
+Note that the sender and the receiver are chosen from $c_0$ with equal probability in scenario4.
 
 \section{Results}
 
 \subsection{Processing speed}
-Trials in tables means that execution of a set of transctions in one scenario counts one trial.
-For example, in scenario1, when trials is 10, transfer from $ct0$ to $ct1$ is executed 10 times.
-On the other hand, in scenario2, when when trials is 10, transfers from $ct0$ to $ct1$
-and $ct1$ to $ct0$ are executed 10 times respectively.
+"Trials" in the tables means the number of executions of a set of transactions in one scenario.
+For example, in scenario1, when the trials is 10, a transaction from $a_0$ to $a_1$
+is executed 10 times.
+On the other hand, in scenario2, when when the trials is 10,
+transactions from $a_0$ to $a_1$ and $a_1$ to $a_0$ are executed 10 times respectively.
 Speed is the number of approved transactions per second.
 
-\begin{table}[htb]
+\begin{table}[t]
     \begin{center}
         \begin{tabular}{c}
 
@@ -324,11 +325,11 @@ Speed is the number of approved transactions per second.
                 \begin{center}
                     \caption{Scenario1}
                     \begin{tabular}{|l|c|} \hline
-                        trials [tx] & speed [tx/s]\\ \hline \hline
-                        10 & 4.30 \\
-                        100 & 5.25 \\
-                        1000 & 4.37 \\ 
-                        10000 & 3.10 \\ \hline
+                        trials & speed [tx/s]\\ \hline \hline
+                        10 & 5.25 \\
+                        100 & 4.27 \\
+                        1000 & 4.43 \\ 
+                        10000 & 3.49 \\ \hline
                     \end{tabular}
                 \end{center}
             \end{minipage}
@@ -337,11 +338,11 @@ Speed is the number of approved transactions per second.
                 \begin{center}
                     \caption{Scenario2}
                     \begin{tabular}{|l|c|} \hline
-                        trials [tx] & speed [tx/s]\\ \hline \hline
-                        10 & 5.11 \\
-                        100 & 5.56 \\
-                        1000 & 4.82 \\
-                        10000 & 1.52 \\ \hline
+                        trials & speed [tx/s]\\ \hline \hline
+                        10 &  5.95 \\
+                        100 & 5.00 \\
+                        1000 & 4.87 \\
+                        10000 & 3.52\\ \hline
                     \end{tabular}
                 \end{center}
             \end{minipage}
@@ -351,32 +352,45 @@ Speed is the number of approved transactions per second.
 \end{table}
 
 
-\begin{table}[htbp]
+\begin{table}[t]
     \begin{center}
         \begin{tabular}{c}
 
-            \begin{minipage}{0.5\hsize}
+            \begin{minipage}{0.33\hsize}
                 \begin{center}
                     \caption{Scenario3}
                     \begin{tabular}{|l|c|} \hline
-                        trials [tx] & speed [tx/s]\\ \hline \hline
-                        10 & 5.35 \\
-                        100 & 5.51 \\
-                        1000 & 5.06 \\
-                        10000 & 1.98 \\ \hline
+                        trials & speed [tx/s]\\ \hline \hline
+                        10 & 5.17 \\
+                        100 & 4.58 \\
+                        1000 & 4.92 \\
+                        10000 & tmp \\ \hline
                     \end{tabular}
                 \end{center}
             \end{minipage}
 
-            \begin{minipage}{0.5\hsize}
+            \begin{minipage}{0.33\hsize}
                 \begin{center}
                     \caption{Scenario4}
                     \begin{tabular}{|l|c|} \hline
-                        trials [tx] & speed [tx/s]\\ \hline \hline
-                        10 & 5.13 \\
-                        100 & 4.40 \\
-                        1000 & 5.13 \\
-                        10000 & 1.97  \\ \hline
+                        trials & speed [tx/s]\\ \hline \hline
+                        10 & 5.33 \\
+                        100 & 5.52 \\
+                        1000 & 5.44 \\
+                        10000 & 4.54 \\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+            \begin{minipage}{0.33\hsize}
+                \begin{center}
+                    \caption{Scenario5}
+                    \begin{tabular}{|l|c|} \hline
+                        trials & speed [tx/s]\\ \hline \hline
+                        10 & 4.34 \\
+                        100 & 5.23 \\
+                        1000 & 4.29 \\
+                        10000 & 3.14 \\ \hline
                     \end{tabular}
                 \end{center}
             \end{minipage}
@@ -385,26 +399,14 @@ Speed is the number of approved transactions per second.
     \end{center}
 \end{table}
 
-\begin{table}[htb]
-  \begin{center}
-    \caption{Scenario5}
-    \begin{tabular}{|l|c|} \hline
-        trials [tx] & speed [tx/s]\\ \hline \hline
-        10 & 3.10 \\
-        100 & 3.13 \\
-        1000 & 4.54 \\
-        10000 & 2.52 \\ \hline
-    \end{tabular}
-  \end{center}
-\end{table}
 
-There are some points that can observe from each table.
-Although there is an exemption, in the most scenarios, the throughput improves
-when trials goes from 10tx to 100tx.
-After that, although there is an exemption too, the throughputs go down as incresing
+% There are some points that can observe from each table.
+% Although there is an exemption, in the most scenarios, the throughput improves
+% when trials goes from 10tx to 100tx.
+Although there is an exemption, the throughputs go down as incresing
 the number of transacitons.
-Especially, the throughputs become less than half when trials go from 1000tx to 10000tx
-in some scenarios.
+% Especially, the throughputs become less than half when trials go from 1000tx to 10000tx
+% in some scenarios.
 
 Next, we can get some tendencies when comparing diffrent scenarios.
 From scenario1 to 4 are sets of transactions in one cluster,
@@ -481,6 +483,7 @@ Suppose that a client sends valid transaction and all servers will send signatur
 if the client do not wait after getting more than two-thirds of all signatures,
 the speed will 1.5 times faster.
 
+% TODO: explain indexes of mysql
 
 \subsection{Algorithm for cryptographic processes}
 The most of bottlenecks is attributed to crytographic processes
