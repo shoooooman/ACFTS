@@ -1,0 +1,523 @@
+\documentclass[a4j,11pt,uplatex,onecolumn]{article}
+
+\usepackage[dvipdfmx]{graphicx}
+\usepackage[dvipdfmx]{color}
+\usepackage{amssymb}
+
+\title{Experiment Results}
+\author{Shoma Mori}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Results}
+
+\subsection{Two servers}
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario1: 0 $\rightarrow$ 1}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 148761791 & 6.722156228947257\\
+        100 & 154409647 & 6.476279296202264\\
+        100 & 156606608 & 6.385426597069263\\ 
+        300 & 160456294 & 6.232226702182215\\
+        500 & 165732700 & 6.033812277239193\\
+        1000 & 168584209 & 5.931753667391232\\
+        10000 & 340150267 & 2.93987715729178\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario2: 0 $\rightleftarrows$ 1}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 150022466 & 6.665668327302392\\
+        20 & 141142712 & 7.085027528732762\\
+        100 & 146183637 & 6.840710906652295\\
+        200 & 149604049 & 6.684311064334896\\
+        300 & 156600000 & 6.385696040868455\\
+        500 & 164927617 & 6.063265923499034\\
+        1000 & 172488666 & 5.797482369073456\\
+        10000 & 1128449240 & 1.772343787479533\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario3: 0 $\rightleftarrows$ 1, 2 $\rightleftarrows$ 3}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 163197556 & 6.127542743348436\\
+        20 & 150765919 & 6.632798756063696\\
+        100 & 148765688 & 6.721980138323294\\
+        100 & 157394283 & 6.353470919906284\\
+        500 & 161453879 & 6.193719260222915\\
+        1000 & 188165741 & 5.314463699319208\\
+        10000 & 1647527738 & 2.427880215756343\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario4: random $\rightarrow$ random}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 150758713 & 6.633115792120088\\
+        50 & 154871001 & 6.456986740855378\\
+        100 & 157023010 & 6.368493381957205\\
+        300 & 156288170 & 6.398436938637134\\
+        500 & 161974002 & 6.173830291604451\\
+        1000 & 171376165 & 5.835117152959981\\
+        10000 & 373847694 & 2.6748860994713\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\subsection{Four servers without indexes}
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario1: 0 $\rightarrow$ 1}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 193722735 & 5.162016734896913\\
+        100 & 202954293 & 4.927217775087911\\
+        500 & 216443685 & 4.620139414092862\\
+        1000 & 231551961 & 4.318685083388259\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario2: 0 $\rightleftarrows$ 1}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 172404407.5 & 5.800315748888264\\
+        100 & 188101597.5 & 5.316275955604258\\
+        500 & 430972190 & 4.640670666012116\\
+        1000 & 112816493.75 & 4.431976064670065\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario3: 0 $\rightleftarrows$ 1, 2 $\rightleftarrows$ 3}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 199265295.5 & 5.018435335118352\\
+        100 & 183712099.5 & 5.443299612391616\\
+        500 & 205771444 & 4.859760813069864\\
+        1000 & 857707469 & 4.663594692329769\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario4: random $\rightarrow$ random}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 194522775 & 5.140786213850795\\
+        100 & 191577972 & 5.219806794906462\\
+        500 & 190691661 & 5.244067804307394\\
+        1000 & 203425823 & 4.915796752116372\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\subsection{Four servers with an index of outputs}
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario1: 0 $\rightarrow$ 1}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 232401207 & 4.302903641976352 \\
+        100 & 190616043 & 5.246148142945135 \\
+        1000 & 228978555 & 4.367221201129512 \\ 
+        10000 & 322216303 & 3.103505287254196 \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario2: 0 $\rightleftarrows$ 1}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 195636468 & 5.111521436790609 \\
+        100 & 179822701.5 & 5.561033126843554 \\
+        1000 & 207332937.5 & 4.823160333605942 \\
+        10000 & 656515472.5 & 1.523193347130139\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario3: 0 $\rightleftarrows$ 1, 2 $\rightleftarrows$ 3}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 186830205 & 5.352453582117517 \\
+        100 & 181332388.25 & 5.514734624359088 \\
+        1000 & 197475370.75 & 5.063922636033334 \\
+        10000 & 504321558.75 & 1.982861891683904 \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario4: random $\rightarrow$ random}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 195030247 & 5.127409801208938 \\
+        100 & 227470659 & 4.396171376107017 \\
+        1000 & 195046753 & 5.126975889724245 \\
+        10000 & 507964728 & 1.968640625771953  \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario5: 0 $\rightarrow$ 4}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 322936844 & 3.096580704801834 \\
+        100 & 319272782 & 3.132117914141519 \\
+        1000 & 220496015 & 4.535229355505586 \\
+        10000 & 396806198 & 2.520121926119712 \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+
+\subsection{Four servers with indexes of outputs and signatures}
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario1: 0 $\rightarrow$ 1}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 190640337 & 5.245479606973208 \\
+        100 & 234391428 & 4.266367625014 \\
+        1000 & 225553084 & 4.433546118128006 \\ 
+        10000 & 286708250 & 3.487866149648641 \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario2: 0 $\rightleftarrows$ 1}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 168101877.5 & 5.948773534667987 \\
+        100 & 201384470 & 4.965626197491793 \\
+        1000 & 205138824.5 & 4.874747637056875 \\
+        10000 & 284447847 & 3.515582946212281\\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario3: 0 $\rightleftarrows$ 1, 2 $\rightleftarrows$ 3}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 193601169.25 & 5.165258060547586 \\
+        100 & 218469990.5 & 4.577287698467676 \\
+        1000 & 203208346.5 & 4.921057708621235 \\
+        10000 & tmp & tmp \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario4: random $\rightarrow$ random}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 187788616 & 5.325136428930282 \\
+        100 & 181267428 & 5.516710922825032 \\
+        1000 & 183694980 & 5.44380690207212 \\
+        10000 & 220173193 & 4.541878992507503 \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario5: 0 $\rightarrow$ 4}
+    \begin{tabular}{|l|c|c|} \hline
+        trials [transaction] & time [ns/transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 230631065 & 4.335929333717468 \\
+        100 & 189092211 & 5.288425127146036 \\
+        1000 & 232953581 & 4.292700699028962 \\
+        10000 & 318292258 & 3.14176664642594 \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+
+\section{Results}
+
+\subsection{Two servers}
+\begin{table}[htb]
+    \begin{center}
+        \begin{tabular}{c}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario1: 0 $\rightarrow$ 1}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 6.72\\
+                        100 & 6.48\\
+                        500 & 6.03\\
+                        1000 & 5.93\\
+                        10000 & 2.94\\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario2: 0 $\rightleftarrows$ 1}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 6.67\\
+                        100 & 6.84\\
+                        500 & 6.06\\
+                        1000 & 5.80\\
+                        10000 & 1.77\\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+        \end{tabular}
+    \end{center}
+\end{table}
+
+
+\begin{table}[htbp]
+    \begin{center}
+        \begin{tabular}{c}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario3: 0 $\rightleftarrows$ 1, 2 $\rightleftarrows$ 3}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 6.13\\
+                        100 & 6.72\\
+                        500 & 6.19\\
+                        1000 & 5.31\\
+                        10000 & 2.43\\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario4: rand $\rightarrow$ rand}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 6.63\\
+                        100 & 6.37\\
+                        500 & 6.17\\
+                        1000 & 5.84\\
+                        10000 & 2.67\\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+        \end{tabular}
+    \end{center}
+\end{table}
+
+
+\subsection{Four servers with an index of outputs}
+\begin{table}[htb]
+    \begin{center}
+        \begin{tabular}{c}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario1: 0 $\rightarrow$ 1}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 4.30 \\
+                        100 & 5.25 \\
+                        1000 & 4.37 \\ 
+                        10000 & 3.10 \\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario2: 0 $\rightleftarrows$ 1}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 5.11 \\
+                        100 & 5.56 \\
+                        1000 & 4.82 \\
+                        10000 & 1.52 \\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+        \end{tabular}
+    \end{center}
+\end{table}
+
+
+\begin{table}[htbp]
+    \begin{center}
+        \begin{tabular}{c}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario3: 0 $\rightleftarrows$ 1, 2 $\rightleftarrows$ 3}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 5.35 \\
+                        100 & 5.51 \\
+                        1000 & 5.06 \\
+                        10000 & 1.98 \\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario4: rand $\rightarrow$ rand}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 5.13 \\
+                        100 & 4.40 \\
+                        1000 & 5.13 \\
+                        10000 & 1.97  \\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+        \end{tabular}
+    \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario5: 0 $\rightarrow$ 4}
+    \begin{tabular}{|l|c|} \hline
+        trials [transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 3.10 \\
+        100 & 3.13 \\
+        1000 & 4.54 \\
+        10000 & 2.52 \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+
+\subsection{Four servers with indexes of outputs and signatures}
+\begin{table}[htb]
+    \begin{center}
+        \begin{tabular}{c}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario1: 0 $\rightarrow$ 1}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 5.25 \\
+                        100 & 4.27 \\
+                        1000 & 4.43 \\ 
+                        10000 & 3.49 \\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario2: 0 $\rightleftarrows$ 1}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 &  5.95 \\
+                        100 & 5.00 \\
+                        1000 & 4.87 \\
+                        10000 & 3.52\\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+        \end{tabular}
+    \end{center}
+\end{table}
+
+
+\begin{table}[htbp]
+    \begin{center}
+        \begin{tabular}{c}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario3: 0 $\rightleftarrows$ 1, 2 $\rightleftarrows$ 3}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 5.17 \\
+                        100 & 4.58 \\
+                        1000 & 4.92 \\
+                        10000 & tmp \\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+            \begin{minipage}{0.5\hsize}
+                \begin{center}
+                    \caption{Scenario4: rand $\rightarrow$ rand}
+                    \begin{tabular}{|l|c|} \hline
+                        trials [tx] & speed [tx/s]\\ \hline \hline
+                        10 & 5.33 \\
+                        100 & 5.52 \\
+                        1000 & 5.44 \\
+                        10000 & 4.54 \\ \hline
+                    \end{tabular}
+                \end{center}
+            \end{minipage}
+
+        \end{tabular}
+    \end{center}
+\end{table}
+
+\begin{table}[htb]
+  \begin{center}
+    \caption{Scenario5: 0 $\rightarrow$ 4}
+    \begin{tabular}{|l|c|} \hline
+        trials [transaction] & speed [transaction/s]\\ \hline \hline
+        10 & 4.34 \\
+        100 & 5.23 \\
+        1000 & 4.29 \\
+        10000 & 3.14 \\ \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+
+
+
+
+
+
+
+\end{document}
+
+
