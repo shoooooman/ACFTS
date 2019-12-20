@@ -54,23 +54,26 @@ ETH Zürich}
 \chapter{Introduction}
 
 In the existing blockchain systems, it is assumed that the consensus problems
-should be solved to achieve correctness.
+should be solved to achieve trust.
 For instance, Bitcoin uses proof-of-work to get consensus among agents in distributed systems.
-
 However, proof-of-work algorithm takes much cost and therefore prevents scalability.
-The transaction systems can get popularity if they get scalability improvement.
+\TODO{Show other related works and present their problems.}
 
-We introduce Asynchronous Consensus-Free Transaction Systems (ACFTS) aiming to get scalability
-by removing consensus protocol.
-ACFTS verifies transactions using agents call servers, which dedicate to manage transactions
-and keep correctness in the system.
+We introduce Asynchronous Consensus-Free Transaction Systems (ACFTS),
+which does not aim to make consensus to get scalability.
+In ACFTS, transactions are approved by the agents called servers,
+which dedicate to manage transactions and keep the correctness of the history of transactions.
 The servers put their signatures to prove the correctness of transactions.
-Importantly, the servers work asynchronously meaning each server does not have to
-communicate with other servers.
+Importantly, the servers work asynchronously meaning each server
+does not communicate with other servers.
 In other words, ACFTS does not need consensus.
+\TODO{Mention the advantages of asynchronous systems.}
 
-We implemented ACFTS as a payment system and evaluated the throughput.
-From the results, we found that the part of the verification of signatures becomes a bottleneck.
+We implemented ACFTS as a payment system and evaluated the throughputs.
+From the results, we found that creating signatures and verification of signatures
+can be bottlenecks in a server.
+Furthermore, we can see that it is necessary to improve how to store the transaction data
+to get scalability.
 
 \chapter{Asynchronous Consensus-Free Transaction Systems}
 
@@ -116,7 +119,7 @@ Normally, outputs can be identified with an address and the previous hash.
 However, even if one transaction has multiple outputs that belong to the same addresses
 and have the same previous transaction, they are identified by the indexes.
 
-% TODO: insert graphs to describe the structure of transactions
+\TODO{Insert graphs to describe the structure of transactions.}
 
 \subsubsection{Genesis}
 All outputs are created from any inputs, but the only genesis is different.
@@ -148,7 +151,7 @@ This reduces the number of necessary signatures and saves the cost as a result.
 Finally, the server adds the outputs into their storage
 and updates the status of the inputs to record that they cannot be used anymore.
 
-% TODO: insert graphs that describes the overview of signatures and verification.
+\TODO{Insert graphs that describes the overview of verification process.}
 
 
 \subsection{Client}
@@ -324,6 +327,7 @@ Speed is the number of approved transactions per second.
             \begin{minipage}{0.5\hsize}
                 \begin{center}
                     \caption{Scenario1}
+                    \label{tbl:scenario1}
                     \begin{tabular}{|l|c|} \hline
                         trials & speed [tx/s]\\ \hline \hline
                         10 & 5.25 \\
@@ -337,6 +341,7 @@ Speed is the number of approved transactions per second.
             \begin{minipage}{0.5\hsize}
                 \begin{center}
                     \caption{Scenario2}
+                    \label{tbl:scenario2}
                     \begin{tabular}{|l|c|} \hline
                         trials & speed [tx/s]\\ \hline \hline
                         10 &  5.95 \\
@@ -359,6 +364,7 @@ Speed is the number of approved transactions per second.
             \begin{minipage}{0.33\hsize}
                 \begin{center}
                     \caption{Scenario3}
+                    \label{tbl:scenario3}
                     \begin{tabular}{|l|c|} \hline
                         trials & speed [tx/s]\\ \hline \hline
                         10 & 5.17 \\
@@ -372,6 +378,7 @@ Speed is the number of approved transactions per second.
             \begin{minipage}{0.33\hsize}
                 \begin{center}
                     \caption{Scenario4}
+                    \label{tbl:scenario4}
                     \begin{tabular}{|l|c|} \hline
                         trials & speed [tx/s]\\ \hline \hline
                         10 & 5.33 \\
@@ -385,9 +392,10 @@ Speed is the number of approved transactions per second.
             \begin{minipage}{0.33\hsize}
                 \begin{center}
                     \caption{Scenario5}
+                    \label{tbl:scenario5}
                     \begin{tabular}{|l|c|} \hline
                         trials & speed [tx/s]\\ \hline \hline
-                        10 & 4.34 \\
+                        10 &  5.38 \\
                         100 & 5.23 \\
                         1000 & 4.29 \\
                         10000 & 3.14 \\ \hline
@@ -400,15 +408,8 @@ Speed is the number of approved transactions per second.
 \end{table}
 
 
-% There are some points that can observe from each table.
-% Although there is an exemption, in the most scenarios, the throughput improves
-% when trials goes from 10tx to 100tx.
-Although there are exemptions, the throughputs go down as increasing
-the number of transacitons.
-% Especially, the throughputs become less than half when trials go from 1000tx to 10000tx
-% in some scenarios.
-
-We found some tendencies when comparing different kinds of scenarios.
+Although there are exemptions, the throughputs go down as increasing the number of transacitons.
+We also found some tendencies when comparing different kinds of scenarios.
 From scenario1 to 4 are sets of transactions within one cluster,
 but scenario5 is a set of ones between two clusters.
 The overall throughput of scenario5 is less than the others.
@@ -491,9 +492,8 @@ which is called when adding the signatures to the database.
 Table~\ref{tbl:bn-client} shows the ratios of CPU use of each function
 to acfts-client.executeTxs in the two periods.
 It is found that the ratios of acfts-client.getServerSig and acfts-client.findUTXOs increased.
-% FIXME: discussionに移動する？
-These two functions search specific records from the tables of signatures and outputs respectively.
-Although we have put indexes on the tables of outputs and signatures to search records effectively, the costs still rise as increasing the number of records.
+These two functions search specific records from the tables of signatures
+and outputs respectively.
 \begin{table}[t]
     \begin{center}
         \caption{The ratios of main functions to executeTxs}
@@ -537,76 +537,102 @@ meaning that the efficiency of the server does not change
 depending on the number of transactions.
 
 \section{Discussion}
-% TODO: why the throughput goes up from 10x to 100x
 
-% TODO: why the throughput goes down from 1000x to 10000x
+\subsection{Client database bottleneck}
+From the results of benchmarking, we found that throughputs go down
+as increasing the number of transactions.
+According to the results of the profiling (Table~\ref{tbl:bn-client}, \ref{tbl:bn-server}),
+it is thought that the cause derives from acfts-client.getServerSigs and acfts-client.findUTXOs.
+It is because the ratios of CPU use of these functions go up
+while the others go down as the number of transactions increases.
+These two functions get records of signatures and outputs from the tables in the database.
+The more the number of transactions increases,
+the more the number of records that the program has to look up.
+As a result, the processing speed goes down.
+
+Although we have set indexes on the tables of outputs and signatures
+to search records effectively, the costs still rise as increasing the number of records.
+It is required to remove the bottlenecks to get more scalability.
+
+As for the signatures, it will be enough to save them in a hash table whose inputs are
+an address, the previous hash and an index of a UTXO and outputs are the signatures.
+On the other hand, regarding the outputs, acfts-client.findUTXOs has to search UTXOs
+which are owned by the client until the sum of the amounts becomes larger than or equal to
+the necessary amount.
+If the outputs are saved in a hash table whose input is an address and outputs are
+an array of UTXOs, it is required to look up UTXOs linearly after all.
+It also costs much when the number of transactions is large.
+
+One of the possible improvements is that periodically, making transactions
+within each cluster that put together some outputs which are owned by the same addresses.
+The reason why acfts-client.findUTXOs can be a bottleneck is that that has to
+look up a large number of outputs many times.
+Therefore, if the number of outputs to be looked up decreases, the cost should decrease too.
+
 
 \subsection{Transaction between different clusters}
-Throughput of scenario5 is smaller than the other scenarios.
-Clients have to send UTXOs to different clusters
-when they make outputs that include ones belonging to different clusters.
-Now the sender waits for a response from the receiver, which can cost time.
-
-One of the ways to improve throughputs of transactions among clusters
-is that not to wait for the responses.
-Actually, in the real use of this system such as payment in cafe,
-a payer sends signatures of servers in some way or just show something (e.g. QR code)
-which has the information.
-Then, it is not necessary for a payee to respond in some digital way.
+One of the ways to improve throughputs of transactions among clusters is not to wait
+for the responses.
+Actually, in the real use of this system such as payment in a cafe,
+it is enough for a payer to send signatures of servers in some way
+or just show something (e.g. QR code) which has the information to a payee.
+Then, the payee does not need to respond in some digital way.
 
 
-% TODO: how to remove (reduce) the bottlenecks
 \subsection{Waiting for signatures from servers}
 Currently, clients wait for responses from all servers
-after they sent requests of new transactions.
-However, it is enought if they have only two-thirds of all signatures
+after they sent requests for new transactions.
+However, it is enough if they have more than two-thirds of all signatures
 to show the validity of the new transactions.
-Suppose that a client sends valid transaction and all servers will send signatures back,
-if the client do not wait after getting more than two-thirds of all signatures,
+Suppose that a client sends a valid transaction and all servers will send signatures back.
+If the client does not wait after getting more than two-thirds of all signatures,
 the speed will 1.5 times faster.
 
-% TODO: use dictionary instead of relational database for getting scalability
-
-% TODO: explain indexes of mysql
 
 \subsection{Algorithm for cryptographic processes}
-The most of bottlenecks is attributed to crytographic processes
+The most of spending time in a server is attributed to cryptographic processes
 such as make signatures and verification of the signatures.
 There are no specific reasons why we must adopt ECDSA as the algorithm
 for the cryptographic processes.
-We can take into account other algorithms for our system.
+We can take into account other cryptographic algorithms for our system.
 
 
 \subsection{Changes of servers}
-Now the number of servers and their addresses are fixed.
-However, if the servers are fixed permanetly,
-they can be a vulnerability when some of them stop or break.
-To avoid that situation, the system should adapt to changes of servers.
+Now, the number of servers and their addresses are fixed.
+However, if the servers are fixed permanently, they will be a vulnerability
+when some of them stop or break.
+To avoid that situation, the system should adapt to the replacement of servers.
+Now, there are no ways for servers to let clients know the replacement of themselves.
 
 \subsection{Run in a real environment}
-% TODO: write about real environments like AWS
-
-
-
-
+The experiments do not consider network delay.
+However, that can be a critical issue when measuring the throughputs in a real environment.
+It is thought that measurement using a real environment such as a public cloud service is needed.
 
 \chapter{Conclusion}
-\TODO{This is a TODO annotation.}
+In this thesis, we introduced ACFTS, asynchronous consensus-free transaction systems.
+ACFTS can provide the functionality that approves only correct transactions without consensus.
+The servers who verify transaction work without communication among them,
+and therefore they do not need synchronization.
 
-\begin{theorem}[First Theorem] \label{thm:first theorem}
-	This is our first theorem.
-\end{theorem}
+On the other hand, the results of the experiments have shown that
+making and verifying signatures cost time.
+Moreover, the more the number of approved transactions increases,
+the more creating new transactions takes.
+We can see that it is required to improve how to store transactions to get scalability.
 
-\begin{proof}
-	And this is the proof of the first theorem with a complicated formula and a reference to Theorem \ref{thm:first theorem}. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.
-	\begin{equation}
-		{\frac {\mathrm d}{\mathrm dx}}\arctan(\sin({x}^{2}))=-2 \cdot {\frac {\cos({x}^{2})x}{-2+\left (\cos({x}^{2})\right )^{2}}}
-	\end{equation}
-\end{proof}
+% \begin{theorem}[First Theorem] \label{thm:first theorem}
+% 	This is our first theorem.
+% \end{theorem}
 
-And here we cite some external documents~\cite{TestReference, TestReference2}.
-An example of an included graphic can be found in Figure~\ref{fig:example_figure}.
-Note that in \LaTeX, ``quotes'' do not use the usual double quote characters.
+% \begin{proof}
+% 	And this is the proof of the first theorem with a complicated formula and a reference to Theorem \ref{thm:first theorem}. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.
+% 	\begin{equation}
+% 		{\frac {\mathrm d}{\mathrm dx}}\arctan(\sin({x}^{2}))=-2 \cdot {\frac {\cos({x}^{2})x}{-2+\left (\cos({x}^{2})\right )^{2}}}
+% 	\end{equation}
+% \end{proof}
+
+% And here we cite some external documents~\cite{TestReference, TestReference2}.
 
 % This displays the bibliography for all cited external documents. All references have to be defined in the file references.bib and can then be cited from within this document.
 \bibliographystyle{IEEEtran}
