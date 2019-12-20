@@ -37,13 +37,25 @@ ETH Zürich}
 \cleardoublepage
 
 \begin{acknowledgements}
-	I thank Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
+    I thank my supervisors Roland Schmid and Jakub Sliwinski for their great support
+    during my thesis.
+    Special thanks to Prof. Roger Wattenhofer for giving me the opportunity to do this project.
 \end{acknowledgements}
 
 
 \begin{abstract}
-    The abstract should be short, stating what you did and what the most important result is.
-	Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
+In the existing blockchain systems, it is assumed that the consensus problems
+should be solved to achieve trust in transactions, while some consensus algorithms cost much.
+We introduce Asynchronous Consensus-Free Transaction Systems (ACFTS),
+which correctly manages the history of transactions without consensus.
+ACFTS dons not need heavy computational power, and the decisions are never overturned
+due to its deterministic feature.
+
+We implemented ACFTS as a payment system and evaluated the throughput.
+From the results, we found that the parts of creating and verifying signatures
+can be bottlenecks.
+Furthermore, we can see that it is necessary to improve how to store the transaction data
+to get more scalability.
 \end{abstract}
 
 \tableofcontents
@@ -54,7 +66,7 @@ ETH Zürich}
 \chapter{Introduction}
 
 In the existing blockchain systems, it is assumed that the consensus problems
-should be solved to achieve trust.
+should be solved to achieve trust in transactions.
 For instance, Bitcoin~\cite{bitcoin} provides proof-of-work to make consensus
 among agents in distributed systems.
 Proof-of-work is one of the randomized algorithms using comutational power
@@ -64,10 +76,9 @@ Proof-of-work needs to much computational power to prevent that the history of t
 is reverted, thus preventing scalability neither.
 Furthermore, due to the randomized property, transactions are never finalized,
 and can be overturned with decreasing probability.
-\TODO{Show other related works and present their problems.}
 
 We introduce Asynchronous Consensus-Free Transaction Systems (ACFTS),
-which does not make a consensus in order to get scalability.
+which correctly manages the history of transactions without consensus.
 In ACFTS, transactions are approved by the agents called servers,
 which dedicate to manage transactions and keep the correctness of the history of transactions.
 The servers put their signatures to prove the correctness of transactions.
@@ -84,10 +95,10 @@ In this system, a static set of validators confirms transactions without consens
 Our system is mainly based on \cite{abc}, which introduces the concept of asynchronous transaction systems without consensus.
 
 We implemented ACFTS as a payment system and evaluated the throughput.
-From the results, we found that creating signatures and verification of signatures
-can be bottlenecks in a server.
+From the results, we found that the parts of creating and verifying signatures
+can be bottlenecks.
 Furthermore, we can see that it is necessary to improve how to store the transaction data
-to get scalability.
+to get more scalability.
 
 \chapter{Asynchronous Consensus-Free Transaction Systems}
 
@@ -153,8 +164,8 @@ to confirm the ownership.
 Then, the server verifies signatures of servers which are also contained in the inputs.
 We assume that each server knows the public keys of all the other servers.
 Importantly, the number of valid signatures must be more than two-thirds of all servers
-to use the UTXOs to prevent from \emph{double-spending} (the details will be described in ).
-% FIXME: add ref
+to use the UTXOs to prevent from \emph{double-spending}
+(the details will be described in \ref{sub:double-spending}).
 A UTXO that has signatures from more than two-thirds of all servers is called a valid UTXO.
 Finally, the server checks if the sum of the amounts of the outputs is the same
 as one of the amounts of the inputs.
@@ -166,8 +177,6 @@ which means the signature is created from the entire outputs, not from each outp
 This reduces the number of necessary signatures and saves the cost as a result.
 Finally, the server adds the outputs into their storage
 and updates the status of the inputs to record that they cannot be used anymore.
-
-\TODO{Insert graphs that describes the overview of verification process.}
 
 
 \subsection{Client}
@@ -208,6 +217,7 @@ that represents a transfer of the cryptocurrency from client $c_1$ to $c_2$.
 
 
 \subsection{Double-spending}
+\label{sub:double-spending}
 In general transaction systems, using the same outputs more than twice,
 so-called \emph{double-spending}, is one of the critical problems.
 We call the transactions that use the same UTXO as their inputs conflicting transactions.
@@ -312,11 +322,13 @@ In the initialization process, each cluster exchanges their addresses and theref
 
 \chapter{Experiment}
 We evaluated the throughput of our systems by experiments using some scenarios of transactions.
-The system is implemented in Go and was benchmarked in a local environment.
+The system is implemented in Go and was benchmarked in a local environment
+using testing package ~\cite{testing, flags} in Go.
 The benchmarking has been performed on a laptop with Intel Core i5 3.1GHz CPU and 16GB RAM.
 We do not assume network delay.
 
-We also profiled the system to find bottlenecks.
+We also profiled the system to find bottlenecks using pprof~\cite{pprof, profiling},
+a Go library for profiling and visualization of programs.
 
 \section{Design}
 \begin{itemize}
@@ -347,6 +359,7 @@ is executed 10 times.
 On the other hand, in scenario2, when when the trials is 10,
 transactions from $a_0$ to $a_1$ and $a_1$ to $a_0$ are executed 10 times respectively.
 Speed is the number of approved transactions per second.
+Although there are exemptions, the throughputs go down as increasing the number of transactions.
 
 \begin{table}[t]
     \begin{center}
@@ -436,19 +449,12 @@ Speed is the number of approved transactions per second.
 \end{table}
 
 
-Although there are exemptions, the throughputs go down as increasing the number of transactions.
-% TODO: scenario間の違いに言及
-% We also found some tendencies when comparing different kinds of scenarios.
-% From scenario1 to 4 are sets of transactions within one cluster,
-% but scenario5 is a set of ones between two clusters.
-% The overall throughput of scenario5 is less than the others.
-
-
 \subsection{Bottlenecks}
 We employed flame graphs to find bottlenecks of the system.
 
 \subsubsection{Flame graph}
-Flame graphs are a visualization that allows identifying the most frequent code-paths.
+Flame graphs~\cite{flame} are a visualization that allows identifying
+the most frequent code-paths.
 The y-axis shows the stack depth, ordered from root at the top to leaf at the bottom.
 The x-axis spans the stack trace collection.
 The width of each function box shows the frequency at which that function was present
@@ -513,7 +519,8 @@ acfts-client.getServerSigs is a function that selects the server's signatures
 of each UTXO from the database.
 acfts-client.updateOutputs is called when a client receives responses from servers.
 It creates new outputs and adds signatures from servers.
-gorm.(*Association).Append is a function of the Object-relational mapping (ORM) library,
+gorm.(*Association).Append is a function of GORM~\cite{gorm},
+a Object-relational mapping (ORM) library in Go,
 which is called when adding the signatures to the database.
 
 Table~\ref{tbl:bn-client} shows the ratios of CPU use of each function
@@ -553,7 +560,8 @@ when receiving requests from clients.
 As we can see Figure~\ref{fig:fg-server-b} and \ref{fig:fg-server-e}, it is found
 that api.verifyUTXO, api.unlockUTXO and api.createSignature are the dominant functions.
 If we trace the stacks, we can see that ecdsa.Verify and ecdsa.Sign are called in each function.
-ecdsa is a cryptographic library of the Elliptic Curve Digital Signature Algorithm in Go.
+ecdsa is a cryptographic library of the Elliptic Curve Digital Signature Algorithm~\cite{ecdsa}
+in Go.
 In api.verifyUTXO, a server verifies signatures of the receiving UTXO used in the inputs.
 In api.unlockUTXO, a server verifies a signature of the client attached to the request.
 In api.createSignature, a server issues a signature to prove the correctness of the transaction.
@@ -578,7 +586,8 @@ the more the number of records that the program has to look up.
 As a result, the processing speed goes down.
 
 Although we have set indexes on the tables of outputs and signatures
-to search records effectively, the costs still rise as increasing the number of records.
+to search records effectively~\cite{mysql, multiple},
+the costs still rise as increasing the number of records.
 It is required to remove the bottlenecks to get more scalability.
 
 As for the signatures, it will be enough to save them in a hash table whose inputs are
@@ -622,6 +631,9 @@ such as make signatures and verification of the signatures.
 There are no specific reasons why we must adopt ECDSA as the algorithm
 for the cryptographic processes.
 We can take into account other cryptographic algorithms for our system.
+Go provides some libraries for other algorithms
+such as RSA~\cite{rsa} and the Digital Signature Algorithm~(DSA)~\cite{dsa}.
+
 
 
 \subsection{Changes of servers}
