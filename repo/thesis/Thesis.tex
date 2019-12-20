@@ -403,13 +403,13 @@ Speed is the number of approved transactions per second.
 % There are some points that can observe from each table.
 % Although there is an exemption, in the most scenarios, the throughput improves
 % when trials goes from 10tx to 100tx.
-Although there is an exemption, the throughputs go down as incresing
+Although there are exemptions, the throughputs go down as increasing
 the number of transacitons.
 % Especially, the throughputs become less than half when trials go from 1000tx to 10000tx
 % in some scenarios.
 
-Next, we can get some tendencies when comparing diffrent scenarios.
-From scenario1 to 4 are sets of transactions in one cluster,
+We found some tendencies when comparing different kinds of scenarios.
+From scenario1 to 4 are sets of transactions within one cluster,
 but scenario5 is a set of ones between two clusters.
 The overall throughput of scenario5 is less than the others.
 
@@ -420,39 +420,121 @@ The overall throughput of scenario5 is less than the others.
 We employed flame graphs to find bottlenecks of the system.
 
 \subsubsection{Flame graph}
-Flame graph is a visualization tool which allows identify the most frequent code-paths.
+Flame graphs are a visualization that allows identifying the most frequent code-paths.
 The y-axis shows the stack depth, ordered from root at the top to leaf at the bottom.
 The x-axis spans the stack trace collection.
 The width of each function box shows the frequency at which that function was present
 in the stack traces, or part of a stack trace ancestry.
-Bottleneck functions have wide width boxes in the flame graphs.
+In the flame graphs, bottleneck functions should be shown as wide width boxes.
 
-% TODO: どんなtxを実行しているときに記録したflame graphなのかに言及する
-% TODO: txの数が増えているときのflame graphも載せる
+We profiled a client program and a server program when executing scenario1 (trials = 10000).
+In order to investigate the difference of the CPU status depending on timing,
+we analyzed the programs during the first 60 seconds and the last 60 seconds of the execution.
 
-\begin{figure}
+Figure~\ref{fig:fg-server-b} shows the analysis result of a server during the first 60 sec and
+Figure~\ref{fig:fg-server-e} shows the one during the last 60 seconds.
+Figure~\ref{fig:fg-client-b} shows the analysis result of a client during the first 60 sec and
+Figure~\ref{fig:fg-client-e} shows the one during the last 60 seconds.
+
+\begin{figure}[p]
     \begin{center}
-        \includegraphics[width=\columnwidth]{figures/server_flame_graph}
-        \caption{Flame graph in a server}
-        \label{fig:server-fg}
+        \includegraphics[width=\columnwidth]{figures/flame_graph_client_begining}
+        \caption{The flame graph in a client during the first 60 seconds of the execution}
+        \label{fig:fg-client-b}
     \end{center}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[p]
     \begin{center}
-        \includegraphics[width=\columnwidth]{figures/client_flame_graph}
-        \caption{Flame graph in a client}
-        \label{fig:client-fg}
+        \includegraphics[width=\columnwidth]{figures/flame_graph_client_ending}
+        \caption{The flame graph in a client during the last 60 seconds of the execution}
+        \label{fig:fg-client-e}
     \end{center}
 \end{figure}
 
-As we can see in the flame graph of a server-side, % FIXME: insert ref
-it is found that api.verifyUTXO, api.unlockUTXO and api.createSignature cost much.
-If you trace the stacks, ecdsa.Verify and ecdsa.Sign are the causes of the bottlenecks.
+
+\begin{figure}[p]
+    \begin{center}
+        \includegraphics[width=\columnwidth]{figures/flame_graph_server_begining}
+        \caption{The flame graph in a server during the first 60 seconds of the execution}
+        \label{fig:fg-server-b}
+    \end{center}
+\end{figure}
+
+\begin{figure}[p]
+    \begin{center}
+        \includegraphics[width=\columnwidth]{figures/flame_graph_server_ending}
+        \caption{The flame graph in a server during the last 60 seconds of the execution}
+        \label{fig:fg-server-e}
+    \end{center}
+\end{figure}
+
+In a client program, acfts-client.executeTxs is a function that creates requests,
+sends them to all servers, waits for responses and updates the output table in the database.
+From Figure~\ref{fig:fg-client-b} and \ref{fig:fg-client-e}, we can see
+that acfts-client.createJSONStr and acfts-client.updateOutputs account for
+the most of CPU when acfts-executeTxs is on the stack.
+acfts-client.createJSONStr is a function that makes JSON string for a request.
+The resource of acfts-client.createJSONStr is used mainly by acfts-client.findUTXOs,
+acfts-client.getClientSig, and acfts-client.getServerSigs.
+acfts-client.findUTXO is a function that finds valid UTXOs from the database.
+acfts-client.getClientSig is a function that creates a signature of the client
+to show the ownership of the UTXOs.
+This calls ecdsa.Sign which is one of the library functions that makes a signature.
+acfts-client.getServerSigs is a function that selects the server's signatures
+of each UTXO from the database.
+acfts-client.updateOutputs is called when a client receives responses from servers.
+It creates new outputs and adds signatures from servers.
+gorm.(*Association).Append is a function of the Object-relational mapping (ORM) library,
+which is called when adding the signatures to the database.
+
+Table~\ref{tbl:bn-client} shows the ratios of CPU use of each function
+to acfts-client.executeTxs in the two periods.
+It is found that the ratios of acfts-client.getServerSig and acfts-client.findUTXOs increased.
+% FIXME: discussionに移動する？
+These two functions search specific records from the tables of signatures and outputs respectively.
+Although we have put indexes on the tables of outputs and signatures to search records effectively, the costs still rise as increasing the number of records.
+\begin{table}[t]
+    \begin{center}
+        \caption{The ratios of main functions to executeTxs}
+        \label{tbl:bn-client}
+        \begin{tabular}{|c|c|c|} \hline
+            name & first 60s [\%] & last 60s [\%] \\ \hline \hline
+            getClientSig & 43.4 & 40.4 \\
+            getServerSigs & 6.13 & 10.3 \\
+            findUTXOs & 3.06 & 4.23 \\ \hline
+            % & 52.59 & 54.93 \\ \hline
+            updateOutputs & 41.0 & 39.9 \\ \hline
+        \end{tabular}
+    \end{center}
+\end{table}
+\begin{table}[t]
+    \begin{center}
+        \caption{The ratios of main functions to VerifyTransaction}
+        \label{tbl:bn-server}
+        \begin{tabular}{|c|c|c|} \hline
+            name & first 60s [\%] & last 60s [\%] \\ \hline \hline
+            verifyUTXO & 65.1 & 64.1 \\
+            unlockUTXO & 22.7 & 23.1 \\
+            createSignature & 10.9 & 10.5 \\ \hline
+        \end{tabular}
+    \end{center}
+\end{table}
+
+In a server program, api.VerifyTransaction is called at first
+when receiving requests from clients.
+As we can see Figure~\ref{fig:fg-server-b} and \ref{fig:fg-server-e}, it is found
+that api.verifyUTXO, api.unlockUTXO and api.createSignature are the dominant functions.
+If we trace the stacks, we can see that ecdsa.Verify and ecdsa.Sign are called in each function.
 ecdsa is a cryptographic library of the Elliptic Curve Digital Signature Algorithm in Go.
 In api.verifyUTXO, a server verifies signatures of the receiving UTXO used in the inputs.
-In api.unlockUTXO, a server verifies a signature of the client who sent the request.
-In api.createSignature, a server issue a signature to prove the correctness of the transaction.
+In api.unlockUTXO, a server verifies a signature of the client attached to the request.
+In api.createSignature, a server issues a signature to prove the correctness of the transaction.
+
+Table~\ref{tbl:bn-server} shows the ratios of CPU use of each function to api.VerifyTransaction.
+There are no significant differences between the first 60 sec and the last 60 sec,
+meaning that the efficiency of the server does not change
+depending on the number of transactions.
 
 \section{Discussion}
 % TODO: why the throughput goes up from 10x to 100x
@@ -483,6 +565,8 @@ Suppose that a client sends valid transaction and all servers will send signatur
 if the client do not wait after getting more than two-thirds of all signatures,
 the speed will 1.5 times faster.
 
+% TODO: use dictionary instead of relational database for getting scalability
+
 % TODO: explain indexes of mysql
 
 \subsection{Algorithm for cryptographic processes}
@@ -502,8 +586,11 @@ To avoid that situation, the system should adapt to changes of servers.
 \subsection{Run in a real environment}
 % TODO: write about real environments like AWS
 
+
+
+
+
 \chapter{Conclusion}
-foofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoo
 \TODO{This is a TODO annotation.}
 
 \begin{theorem}[First Theorem] \label{thm:first theorem}
@@ -516,13 +603,6 @@ foofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoo
 		{\frac {\mathrm d}{\mathrm dx}}\arctan(\sin({x}^{2}))=-2 \cdot {\frac {\cos({x}^{2})x}{-2+\left (\cos({x}^{2})\right )^{2}}}
 	\end{equation}
 \end{proof}
-
-\begin{figure}
-    \centering
-    \includegraphics[width=0.2\columnwidth]{figures/disco_logo_faded}
-    \caption{This is an example graphic.}
-    \label{fig:example_figure}
-\end{figure}
 
 And here we cite some external documents~\cite{TestReference, TestReference2}.
 An example of an included graphic can be found in Figure~\ref{fig:example_figure}.
