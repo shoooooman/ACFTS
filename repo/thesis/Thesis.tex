@@ -196,19 +196,26 @@ namely, double-spending, is one of the critical problems.
 In our system, it is impossible to make transactions that use the same UTXO as the inputs.
 We call those transactions conflicting transactions.
 
-Consider a situation where $c_1$ tries to make two conflicting transactions
-which are payments to $c_2$ and $c_3$.
-To make a transaction valid,
-$c_1$ has to get signatures from more than two-thirds of all servers.
-However, if a server receives two conflicting transactions,
+Consider a situation where $c_0$ tries to make two conflicting transactions
+which are payments to different clients.
+If a server receives two conflicting transactions,
 it creates a signature for only one transaction which comes first.
-In other words, it is impossible for the clientto get signatures of both transactions
+Therefore, it is impossible for the client to get signatures of both transactions
 from the same server.
-Furthermore, the client is incapable of sending each transaction
-to more than two-thirds of all servers without overlapping.
-In short, the two conflicting transactions are never be approved at the same time.
-In this case, only one or neither transaction is approved.
 
+Let $N$ denote the number of servers.
+Note that each server cannot know the status of other servers,
+if the transaction itself in a request has no errors, they approve the transaction.
+Suppose that $c_0$ does not send the request to $f$ servers.
+In this situation, the number of the rest servers is $N-f$.
+In other words, $N-f$ nodes are required for quorum.
+Since $f$ servers of $N-f$ are not trustworthy, $(N-f)-f$ must be greater than $f$,
+that is, $N > 3f$.
+The smallest $N$ that saticefies this condition is $N=3f+1$.
+From this result, we can see that $c_0$ is incapable of making the two conflicting transactions
+approved under the condition that it has to get more than two-thirds of servers (i.e. $\geq2f+1$
+for each transaction.
+Actually, only one or neither transaction is approved.
 
 \chapter{Implementation}
 In this chapter, we describe the system in terms of implementation.
