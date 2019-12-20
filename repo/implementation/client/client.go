@@ -13,10 +13,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	mrand "math/rand"
+
+	// mrand "math/rand"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
@@ -42,6 +42,7 @@ func initDB(num int) *gorm.DB {
 	// Add a index to improve throughput of queries
 	db.Model(&model.Output{}).
 		AddIndex("idx_address_hash", "address1", "address2", "previous_hash")
+	db.Model(&model.Signature{}).AddIndex("idx_signature", "output_id")
 
 	return db
 }
@@ -65,6 +66,7 @@ func deleteAll(db *gorm.DB) {
 
 	db.Model(&model.Output{}).
 		AddIndex("idx_address_hash", "address1", "address2", "previous_hash")
+	db.Model(&model.Signature{}).AddIndex("idx_signature", "output_id")
 }
 
 func initRoute(db *gorm.DB) *gin.Engine {
@@ -710,12 +712,12 @@ var pub2Pri map[string]*ecdsa.PrivateKey
 const n = 4
 
 func main() {
-	serverURLs := []string{
-		"http://localhost:8080",
-		"http://localhost:8081",
-		"http://localhost:8082",
-		"http://localhost:8083",
-	}
+	// serverURLs := []string{
+	// 	"http://localhost:8080",
+	// 	"http://localhost:8081",
+	// 	"http://localhost:8082",
+	// 	"http://localhost:8083",
+	// }
 
 	fmt.Printf("Input client number: ")
 	var num int
@@ -735,47 +737,47 @@ func main() {
 	generateClients(numClients, myurl)
 
 	// For pprof
-	go func() {
-		log.Println(http.ListenAndServe("localhost:7000", nil))
-	}()
+	// go func() {
+	// 	log.Println(http.ListenAndServe("localhost:7000", nil))
+	// }()
 
 	r := initRoute(db)
-	// r.Run(":" + strconv.Itoa(port))
-	go r.Run(":" + strconv.Itoa(port))
+	r.Run(":" + strconv.Itoa(port))
+	// go r.Run(":" + strconv.Itoa(port))
 
 	// const numClusters = 2
-	const numClusters = 1
-	otherClients := getOtherCURLs(cBase, numClusters, num)
-	fmt.Println(otherClients)
-
-	fmt.Println("Input something when all clusters have been registered by all servers.")
-	var dummy string
-	fmt.Scan(&dummy)
-
-	collectOtherAddrs(otherClients)
-
-	addrs := getAllAddrs()
-	log.Println(addrs)
+	// const numClusters = 1
+	// otherClients := getOtherCURLs(cBase, numClusters, num)
+	// fmt.Println(otherClients)
+	//
+	// fmt.Println("Input something when all clusters have been registered by all servers.")
+	// var dummy string
+	// fmt.Scan(&dummy)
+	//
+	// collectOtherAddrs(otherClients)
+	//
+	// addrs := getAllAddrs()
+	// log.Println(addrs)
 
 	// Make a genesis transaction
-L_FOR:
-	for {
-		fmt.Println("Have a genesis?")
-		fmt.Println("1. yes")
-		fmt.Println("2. no")
-		var g int
-		fmt.Scan(&g)
-		switch g {
-		case 1:
-			owner := addrs[0]
-			createGenesis(serverURLs, owner, 200)
-			break L_FOR
-		case 2:
-			break L_FOR
-		default:
-			fmt.Println("Please input valid number.")
-		}
-	}
+	// L_FOR:
+	// 	for {
+	// 		fmt.Println("Have a genesis?")
+	// 		fmt.Println("1. yes")
+	// 		fmt.Println("2. no")
+	// 		var g int
+	// 		fmt.Scan(&g)
+	// 		switch g {
+	// 		case 1:
+	// 			owner := addrs[0]
+	// 			createGenesis(serverURLs, owner, 200)
+	// 			break L_FOR
+	// 		case 2:
+	// 			break L_FOR
+	// 		default:
+	// 			fmt.Println("Please input valid number.")
+	// 		}
+	// 	}
 
 	// Can make transactions between different clusters with generalTxs
 	// one cluster
@@ -784,12 +786,12 @@ L_FOR:
 	// }
 	// executeTxs(serverURLs, atxs1)
 
-	atxs1 := make([]generalTx, 200)
-	tx := generalTx{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{1}}
-	for i := 0; i < 200; i++ {
-		atxs1[i] = tx
-	}
-	executeTxs(serverURLs, atxs1)
+	// atxs1 := make([]generalTx, 200)
+	// tx := generalTx{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{1}}
+	// for i := 0; i < 200; i++ {
+	// 	atxs1[i] = tx
+	// }
+	// executeTxs(serverURLs, atxs1)
 
 	// two clusters
 	// atxs1 := []generalTx{
@@ -856,7 +858,7 @@ L_FOR:
 	// executeTxs(serverURLs, atxs2)
 
 	// case 4: random -> random
-	mrand.Seed(time.Now().UnixNano())
+	// mrand.Seed(time.Now().UnixNano())
 	// tx0 := insideTx{From: 0, To: []int{0, 1, 2, 3}, Amounts: []int{50, 50, 50, 50}}
 	// itxs0 := []insideTx{}
 	// itxs0 = append(itxs0, tx0)

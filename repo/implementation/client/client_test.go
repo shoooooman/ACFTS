@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/braintree/manners"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 func benchmarkSetup(srvURLs []string, numClusters, numClients, gOwner int) []model.Address {
@@ -43,6 +46,11 @@ func benchmarkSetup(srvURLs []string, numClusters, numClients, gOwner int) []mod
 	// Use manners to stop the server every scenaio
 	r := initRoute(db)
 	go manners.ListenAndServe(":"+strconv.Itoa(port), r)
+
+	// For pprof
+	go func() {
+		log.Println(http.ListenAndServe("localhost:7000", nil))
+	}()
 
 	otherClients := getOtherCURLs(cBase, numClusters, num)
 	fmt.Println("other clients")
