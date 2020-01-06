@@ -2,18 +2,21 @@
 
 ## Setup
 
-### mysql
+### mysql (e.g. cluster number 0)
 
 ```
 $ mysql.server start
 $ mysql -u root -p
-mysql> create database acfts_client
+mysql> create database acfts_client_0
 ```
 
-## Run
+## Run (e.g. run with port 3000)
 
 ```
 $ go run client.go
+Input cluster number: 0
+...
+[GIN-debug] Listening and serving HTTP on :3000/
 ```
 
 ## Usage
@@ -82,7 +85,7 @@ txs := []{tx}
 executeTxs(serverURLs, txs)
 ```
 
-### Benchmark
+## Benchmarking
 
 You can benchmark the programs with `go test` command.
 
@@ -115,7 +118,7 @@ By default, 5 scenarios are prepared in `client_test.go`.
 
 In those secarios, client {0, 1, 2, 3} are in cluster0 and client {4, 5, 6, 7} are in cluster1.
 
-Genesis is bound to client 0.
+The genesis is bound to client 0.
 
 Transaction: (from → to, amount)
 
@@ -143,11 +146,11 @@ If you want to benchmark transactions between different clusters, you need to ru
 
 You can see the details of the options [here](https://golang.org/cmd/go/#hdr-Testing_flags).
 
-#### pprof
+### pprof
 
 pprof is a tool for profiling and visualization of programs. pprof provides various information such as flame graphs.
 
-As a setup, the server program needs to listen and serve specified port for pprof.
+As setup, the server program needs to listen and serve specified port for pprof.
 
 ```go
 go func() {
@@ -161,8 +164,21 @@ When you want to profile localhost:7000, run the following command during the ex
 $ go tool pprof -http=":7777" -seconds 60 localhost:7000
 ```
 
-##### Options
+When finishing the profiling, your browser will automatically open and show the result.
+
+#### Options
 
 `-http`: Specify host:post at which you can get an interactive web interface
 
 `-seconds`: Set duration for time-based profile collection
+
+#### Result
+
+After finishing the profiling, the result is saved in your computer.
+
+You can review the result whenever you want by the following command with localhost:7777.
+
+```
+$ go tool pprof -http="localhost:7777" /path/to/pprof/pprof.samples.cpu.001.pb.gz
+```
+
