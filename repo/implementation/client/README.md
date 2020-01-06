@@ -18,82 +18,151 @@ $ go run client.go
 
 ## Usage
 
-Initially, four clients (i.e. four public keys) are generated and verification requests are sent to localhost with port number 8080, 8081, 8082 and 8083.
+You can create a request of a new transaction with  `struct generalTx`.
 
-There are six example cases now. Transaction: (from → to, amount)
+### generalTx
 
-Genesis is bound to client 0 by default.
-
-- case 1: (0 → 1, 200)
-- case 2: (0 ⇄ 1, 200) × 10
-- case 3: (0 ⇄ 1, 50) × 10,  (2 ⇄ 3, 200) × 10 (parallelly)
-- case 4.1: (0 ⇄ 1, 50) × 25,  (1 ⇄ 2, 50) × 25, (2 ⇄ 3, 50) × 25, (3 ⇄ 0, 50) × 25 (parallelly)
-- case 4.2: (0 ⇄ 1, 100) × 25,  (0 ⇄ 1, 100) × 25 (parallelly)
-- case 5: (random → random, 1) × 25
-
-You can create original transactions with `struct simpleTx`.
-
-### SimpleTx
-
-`simpleTx` is a golang struct which has `From`, `To` and `Amounts`.
-
-`From` is `int`. `To` and `Amounts` are arrays of int, which means one transaction represented by `simpleTx` can have multiple outputs although the number of inputs is one. Each element of `Amounts` corresponds to each element of `To` in the same order.
+`generalTx` is a golang struct.
 
 ```go
-tx := simpleTx{From: x, To: []int{y, z}, Amounts: []int{50, 150}}
-```
-
-In this case, transactions (x → y, 50) and (x → z, 150) are created.
-
-#### Execution
-
-To send transactions to servers to get their signatures, call `executeTxs()`.
-
-```go
-func executeTxs(baseURLs []string, txs []simpleTx, async bool, finished chan bool) {...}
-```
-
-`txs` represents a set of transactions which will be verified by servers.
-
-E.g. **case 1**
-
-```
-txs1 := []simpleTx{
-	{From: 0, To: []int{1}, Amounts: []int{200}},
+type generalTx struct {
+	From    model.Address
+	To      []model.Address
+	Amounts []int
 }
-executeTxs(baseURLs, txs1, false, nil)
 ```
 
-#### Execution with multi-thread
+You can designate the sender (`From`), the receivers (`To`) and amounts for each receiver (`Amounts`).
 
-If you want to execute sets of transactions asynchrously, the argument `async` should be `true` and pass `chan bool` for mutual exclusion. Then, call `executeTxs`s  with multi-thread using `go`.
+The orders of `To` and `Amounts` must correspond to each other.
 
-E.g. **case 3**
+### insideTx
+
+If you want to make a transaction inside a cluster, you can use `insideTx` instead of `generalTx`.
 
 ```go
-finished := make(chan bool)
-
-tx0 := simpleTx{From: 0, To: []int{0, 2}, Amounts: []int{50, 150}}
-txs0 := []simpleTx{}
-txs0 = append(txs0, tx0)
-executeTxs(baseURLs, txs0, false, nil)
-
-tx1 := simpleTx{From: 0, To: []int{1}, Amounts: []int{50}}
-tx2 := simpleTx{From: 1, To: []int{0}, Amounts: []int{50}}
-tx3 := simpleTx{From: 2, To: []int{3}, Amounts: []int{150}}
-tx4 := simpleTx{From: 3, To: []int{2}, Amounts: []int{150}}
-txs1 := []simpleTx{}
-txs2 := []simpleTx{}
-for i := 0; i < 10; i++ {
-  txs1 = append(txs1, tx1)
-  txs1 = append(txs1, tx2)
-  txs2 = append(txs2, tx3)
-  txs2 = append(txs2, tx4)
+type insideTx struct {
+	From    int
+	To      []int
+	Amounts []int
 }
-
-go executeTxs(baseURLs, txs1, true, finished)
-go executeTxs(baseURLs, txs2, true, finished)
-<-finished
-<-finished
 ```
 
+`insedeTx` has `From`, `To` and `Amounts` as well as `generalTx`, but the types of the first two are not `model.Address`, but `int` for simplicity.
+
+It means, you can designate the sender and the receivers by client indexes in one cluster.
+
+You can convert `insideTx` to `generalTx` with `convertInsideTxs()`.
+
+### Execution
+
+You generate clients in each cluster with `	generateClients(numClients, myurl)`.
+
+Then, you can get all addresses of clients including other clusters with `getAllAddrs()`.
+
+You need to call `collectOtherAddrs()` before calling `getAllAddrs()` to get addresses of different clusters.
+
+```go
+collectOtherAddrs(otherClients)
+addrs := getAllAddrs()
+```
+
+Now, you can designate the sender and the receivers with `addrs`.
+
+```go
+tx := generalTx{From: addrs[0], To: []int{addrs[1], addrs[2]}, Amounts: []int{10, 20}}
+```
+
+In this case, transactions (addrs[0] → addrs[1], 10) and (addrs[0] → addrs[2], 20) will be created.
+
+To send a request of the transactions to servers to get their signatures, call `executeTxs()`.
+
+```go
+txs := []{tx}
+executeTxs(serverURLs, txs)
+```
+
+### Benchmark
+
+You can benchmark the programs with `go test` command.
+
+You need to prepare benchmark programs first.
+
+```go
+func BenchmarkScenario1(b *testing.B) {
+	serverURLs := []string{
+		"http://localhost:8080",
+		"http://localhost:8081",
+		"http://localhost:8082",
+		"http://localhost:8083",
+	}
+	addrs := benchmarkSetup(serverURLs, 1, 4, 0)
+	defer db.Close()
+
+	atxs1 := []generalTx{
+		{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{1}},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		executeTxs(serverURLs, atxs1)
+	}
+	manners.Close()
+}
+```
+
+By default, 5 scenarios are prepared in `client_test.go`.
+
+In those secarios, client {0, 1, 2, 3} are in cluster0 and client {4, 5, 6, 7} are in cluster1.
+
+Genesis is bound to client 0.
+
+Transaction: (from → to, amount)
+
+- case 1: (0 → 1, 1)
+- case 2: (0 → 1, 1), (1 → 0, 1)
+- case 3: (0 → 1, 500000), (0 → 1, 500000), (2 → 3, 500000), (3 → 2, 500000)
+- case 4: (random → random, 1)
+- case 5: (0 → 4, 1)
+
+In order to run the benchmark, execute the following command.
+
+```
+$ go test -bench Scenario1 -benchtime 10000x -timeout 24h
+```
+
+If you want to benchmark transactions between different clusters, you need to run the other client programs before executing the benchmark command.
+
+#### Options
+
+`-bench regexp`: Choose scenario(s) that you want to run benchmark matching a regular expression.
+
+`-benchtime t`: Set the number of iterations (`b.N`). `Nx`  means each benchmark will be run N times.
+
+`-timeout d`: Set the limit time for benchmarks. The default is 10 mins.
+
+You can see the details of the options [here](https://golang.org/cmd/go/#hdr-Testing_flags).
+
+#### pprof
+
+pprof is a tool for profiling and visualization of programs. pprof provides various information such as flame graphs.
+
+As a setup, the server program needs to listen and serve specified port for pprof.
+
+```go
+go func() {
+	log.Println(http.ListenAndServe("localhost:7000", nil))
+}()
+```
+
+When you want to profile localhost:7000, run the following command during the execution.
+
+```
+$ go tool pprof -http=":7777" -seconds 60 localhost:7000
+```
+
+##### Options
+
+`-http`: Specify host:post at which you can get an interactive web interface
+
+`-seconds`: Set duration for time-based profile collection

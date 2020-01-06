@@ -27,6 +27,7 @@ Input port number: 8080
 # Create genesis
 curl -H 'Content-Type:application/json' -d "$JSON" http://localhost:8080/genesis
 
+# Request for the new transaction
 JSON=$(cat <<EOS
 {
         "inputs": [
@@ -53,7 +54,8 @@ JSON=$(cat <<EOS
                         "siblings": [],
                         "signature1": "sig01",
                         "signature2": "sig02"
-                }],
+                }
+        ],
         "outputs": [
                 {
                         "amount": 200,
@@ -61,7 +63,8 @@ JSON=$(cat <<EOS
                         "address2": "example12",
                         "previous_hash": "a36d289b2ed18b196f07f59489710f45d92a97fdc2e2492dec67cf9cadb3a733",
                         "index": 0
-                }]
+                }
+        ]
 }
 EOS
 )
@@ -69,6 +72,7 @@ EOS
 curl -H 'Content-Type:application/json' -d "$JSON" http://localhost:8080/transaction
 ```
 
+Execute this shell script.
 ```
 $ chmod 755 test.sh
 $ ./test.sh
