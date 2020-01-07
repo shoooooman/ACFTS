@@ -335,7 +335,7 @@ a Go library for profiling and visualization of programs.
     \item The number of servers: 4
     \item The number of clients (clusters): 2 ($c_0$ and $c_1$)
     \item The number of addresses in each client: 4\\
-        ($\{a_0, a_1, a_2, a_3\} \in c_0$ and $\{ct4, ct5, ct6, ct7\} \in c_1$)
+        ($\{a_0, a_1, a_2, a_3\} \in c_0$ and $\{a_4, a_5, a_6, a_7\} \in c_1$)
     \item The genesis: $amount = 1000000$, $owner = c_0$
 \end{itemize}
 
@@ -346,7 +346,7 @@ Every arrow indicates a transfer of 1 amount of cryptocurrency.
     \item Scenario2: $a_0 \rightarrow a_1$, $a_1 \rightarrow a_0$
     \item Scenario3: $a_0 \rightarrow a_1$, $a_1 \rightarrow a_0$, $a_2 \rightarrow a_3$, $a_3 \rightarrow a_2$
     \item Scenario4: $random \rightarrow random~(random \in c_0)$
-    \item Scenario5: $a_0 \rightarrow ct4$
+    \item Scenario5: $a_0 \rightarrow a_4$
 \end{itemize}
 Note that the sender and the receiver are chosen from $c_0$ with equal probability in scenario4.
 
