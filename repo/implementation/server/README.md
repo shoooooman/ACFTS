@@ -82,7 +82,7 @@ $ ./test.sh
 
 pprof is a tool for profiling and visualization of programs. pprof provides various information such as flame graphs.
 
-As setup, the server program needs to listen and serve specified port for pprof.
+As setup, the server program needs to listen and serve the specified port for pprof.
 
 ```go
 go func() {
@@ -100,7 +100,7 @@ When finishing the profiling, your browser will automatically open and show the 
 
 #### Options
 
-`-http`: Specify host:post at which you can get an interactive web interface
+`-http`: Specify host:post on which you can get an interactive web interface
 
 `-seconds`: Set duration for time-based profile collection
 
@@ -108,7 +108,7 @@ When finishing the profiling, your browser will automatically open and show the 
 
 After finishing the profiling, the result is saved in your computer.
 
-You can review the result whenever you want by the following command with localhost:8888.
+You can review the result on localhost:8888 whenever you want by the following command.
 
 ```
 $ go tool pprof -http="localhost:8888" /path/to/pprof/pprof.samples.cpu.001.pb.gz

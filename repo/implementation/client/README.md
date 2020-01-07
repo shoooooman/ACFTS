@@ -53,7 +53,7 @@ type insideTx struct {
 
 `insedeTx` has `From`, `To` and `Amounts` as well as `generalTx`, but the types of the first two are not `model.Address`, but `int` for simplicity.
 
-It means, you can designate the sender and the receivers by client indexes in one cluster.
+It means you can designate the sender and the receivers by the client indexes in one cluster.
 
 You can convert `insideTx` to `generalTx` with `convertInsideTxs()`.
 
@@ -61,7 +61,7 @@ You can convert `insideTx` to `generalTx` with `convertInsideTxs()`.
 
 You generate clients in each cluster with `	generateClients(numClients, myurl)`.
 
-Then, you can get all addresses of clients including other clusters with `getAllAddrs()`.
+Then, you get all addresses of clients including other clusters with `getAllAddrs()`.
 
 You need to call `collectOtherAddrs()` before calling `getAllAddrs()` to get addresses of different clusters.
 
@@ -69,6 +69,8 @@ You need to call `collectOtherAddrs()` before calling `getAllAddrs()` to get add
 collectOtherAddrs(otherClients)
 addrs := getAllAddrs()
 ```
+
+Before you start creating general transactions, you should make genesis with `createGenesis(serverURLs, owner, amount)`. This function must be called only once among all clusters.
 
 Now, you can designate the sender and the receivers with `addrs`.
 
@@ -140,7 +142,7 @@ If you want to benchmark transactions between different clusters, you need to ru
 
 `-bench regexp`: Choose scenario(s) that you want to run benchmark matching a regular expression.
 
-`-benchtime t`: Set the number of iterations (`b.N`). `Nx`  means each benchmark will be run N times.
+`-benchtime t`: Set the number of iterations (`b.N`). If you put `Nx` as t,  each benchmark will be run N times.
 
 `-timeout d`: Set the limit time for benchmarks. The default is 10 mins.
 
@@ -150,7 +152,7 @@ You can see the details of the options [here](https://golang.org/cmd/go/#hdr-Tes
 
 pprof is a tool for profiling and visualization of programs. pprof provides various information such as flame graphs.
 
-As setup, the server program needs to listen and serve specified port for pprof.
+As setup, the server program needs to listen and serve the specified port for pprof.
 
 ```go
 go func() {
@@ -168,7 +170,7 @@ When finishing the profiling, your browser will automatically open and show the 
 
 #### Options
 
-`-http`: Specify host:post at which you can get an interactive web interface
+`-http`: Specify host:post on which you can get an interactive web interface
 
 `-seconds`: Set duration for time-based profile collection
 
@@ -176,7 +178,7 @@ When finishing the profiling, your browser will automatically open and show the 
 
 After finishing the profiling, the result is saved in your computer.
 
-You can review the result whenever you want by the following command with localhost:7777.
+You can review the result on localhost:7777 whenever you want by the following command.
 
 ```
 $ go tool pprof -http="localhost:7777" /path/to/pprof/pprof.samples.cpu.001.pb.gz
