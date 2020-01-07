@@ -712,14 +712,14 @@ var pub2Pri map[string]*ecdsa.PrivateKey
 const n = 4
 
 func main() {
-	// serverURLs := []string{
-	// 	"http://localhost:8080",
-	// 	"http://localhost:8081",
-	// 	"http://localhost:8082",
-	// 	"http://localhost:8083",
-	// }
+	serverURLs := []string{
+		"http://localhost:8080",
+		"http://localhost:8081",
+		"http://localhost:8082",
+		"http://localhost:8083",
+	}
 
-	fmt.Printf("Input client number: ")
+	fmt.Printf("Input cluster number: ")
 	var num int
 	fmt.Scan(&num)
 	db = initDB(num)
@@ -736,101 +736,98 @@ func main() {
 	myurl := cBase + ":" + strconv.Itoa(port)
 	generateClients(numClients, myurl)
 
-	// For pprof
-	// go func() {
-	// 	log.Println(http.ListenAndServe("localhost:7000", nil))
-	// }()
+	/* For pprof */
+	go func() {
+		log.Println(http.ListenAndServe("localhost:7000", nil))
+	}()
 
 	r := initRoute(db)
-	r.Run(":" + strconv.Itoa(port))
-	// go r.Run(":" + strconv.Itoa(port))
+	go r.Run(":" + strconv.Itoa(port))
+	// r.Run(":" + strconv.Itoa(port))
 
-	// const numClusters = 2
-	// const numClusters = 1
-	// otherClients := getOtherCURLs(cBase, numClusters, num)
-	// fmt.Println(otherClients)
-	//
-	// fmt.Println("Input something when all clusters have been registered by all servers.")
-	// var dummy string
-	// fmt.Scan(&dummy)
-	//
-	// collectOtherAddrs(otherClients)
-	//
-	// addrs := getAllAddrs()
-	// log.Println(addrs)
+	const numClusters = 1
+	otherClients := getOtherCURLs(cBase, numClusters, num)
 
-	// Make a genesis transaction
-	// L_FOR:
-	// 	for {
-	// 		fmt.Println("Have a genesis?")
-	// 		fmt.Println("1. yes")
-	// 		fmt.Println("2. no")
-	// 		var g int
-	// 		fmt.Scan(&g)
-	// 		switch g {
-	// 		case 1:
-	// 			owner := addrs[0]
-	// 			createGenesis(serverURLs, owner, 200)
-	// 			break L_FOR
-	// 		case 2:
-	// 			break L_FOR
-	// 		default:
-	// 			fmt.Println("Please input valid number.")
-	// 		}
-	// 	}
+	fmt.Println("Input something when all clusters have been registered by all servers.")
+	var dummy string
+	fmt.Scan(&dummy)
 
-	// Can make transactions between different clusters with generalTxs
-	// one cluster
-	// atxs1 := []generalTx{
-	// 	{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{200}},
-	// }
-	// executeTxs(serverURLs, atxs1)
+	collectOtherAddrs(otherClients)
 
-	// atxs1 := make([]generalTx, 200)
+	addrs := getAllAddrs()
+	log.Println(addrs)
+
+	/* Make the genesis */
+L_FOR:
+	for {
+		fmt.Println("Have a genesis?")
+		fmt.Println("1. yes")
+		fmt.Println("2. no")
+		var g int
+		fmt.Scan(&g)
+		switch g {
+		case 1:
+			owner := addrs[0]
+			createGenesis(serverURLs, owner, 200)
+			break L_FOR
+		case 2:
+			break L_FOR
+		default:
+			fmt.Println("Please input valid number.")
+		}
+	}
+
+	/* Make sample transactions */
+
+	/* Use generalTx */
+
+	// Inside one cluster
+	atxs := []generalTx{
+		{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{200}},
+	}
+	executeTxs(serverURLs, atxs)
+
+	// atxs := make([]generalTx, 200)
 	// tx := generalTx{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{1}}
 	// for i := 0; i < 200; i++ {
-	// 	atxs1[i] = tx
+	// 	atxs[i] = tx
 	// }
-	// executeTxs(serverURLs, atxs1)
+	// executeTxs(serverURLs, atxs)
 
-	// two clusters
-	// atxs1 := []generalTx{
+	// Between two clusters
+	// atxs := []generalTx{
 	// 	{From: addrs[0], To: []model.Address{addrs[4]}, Amounts: []int{200}},
-	// 	// {From: addrs[4], To: []model.Address{addrs[0]}, Amounts: []int{200}},
 	// }
-	// executeTxs(serverURLs, atxs1)
+	// executeTxs(serverURLs, atxs)
 
-	// two clusters
-	// atxs1 := []generalTx{
-	// 	{From: addrs[0], To: []model.Address{addrs[0], addrs[4]}, Amounts: []int{100, 100}},
+	// atxs := make([]generalTx, 200)
+	// tx := generalTx{From: addrs[0], To: []model.Address{addrs[4]}, Amounts: []int{1}}
+	// for i := 0; i < 200; i++ {
+	// 	atxs[i] = tx
 	// }
-	// for i := 0; i < 10; i++ {
-	// 	tx := generalTx{From: addrs[0], To: []model.Address{addrs[4]}, Amounts: []int{10}}
-	// 	// tx := generalTx{From: addrs[4], To: []model.Address{addrs[0]}, Amounts: []int{10}}
-	// 	atxs1 = append(atxs1, tx)
-	// }
-	// executeTxs(serverURLs, atxs1)
+	// executeTxs(serverURLs, atxs)
 
-	// Make sample transactions
+	/* Use insideTx */
+
 	// case 1: 0 -> 1
-	// itxs1 := []insideTx{
+	// itxs := []insideTx{
 	// 	{From: 0, To: []int{1}, Amounts: []int{200}},
 	// }
-	// atxs1 := convertInsideTxs(itxs1)
-	// executeTxs(serverURLs, atxs1)
+	// atxs := convertInsideTxs(itxs)
+	// executeTxs(serverURLs, atxs)
 
 	// case 2: 0 <-> 1
 	// tx1 := insideTx{From: 0, To: []int{1}, Amounts: []int{200}}
 	// tx2 := insideTx{From: 1, To: []int{0}, Amounts: []int{200}}
-	// itxs1 := []insideTx{}
+	// itxs := []insideTx{}
 	// for i := 0; i < 10; i++ {
-	// 	itxs1 = append(itxs1, tx1)
-	// 	itxs1 = append(itxs1, tx2)
+	// 	itxs = append(itxs, tx1)
+	// 	itxs = append(itxs, tx2)
 	// }
-	// atxs1 := convertInsideTxs(itxs1)
-	// executeTxs(serverURLs, atxs1)
+	// atxs := convertInsideTxs(itxs)
+	// executeTxs(serverURLs, atxs)
 
-	// case 3: 0 <-> 1 & 2 <-> 3 (parallelly)
+	// case 3: 0 <-> 1 & 2 <-> 3
 	// tx0 := insideTx{From: 0, To: []int{0, 2}, Amounts: []int{50, 150}}
 	// itxs0 := []insideTx{}
 	// itxs0 = append(itxs0, tx0)
@@ -839,23 +836,17 @@ func main() {
 	//
 	// tx1 := insideTx{From: 0, To: []int{1}, Amounts: []int{50}}
 	// tx2 := insideTx{From: 1, To: []int{0}, Amounts: []int{50}}
+	// tx3 := insideTx{From: 2, To: []int{3}, Amounts: []int{150}}
+	// tx4 := insideTx{From: 3, To: []int{2}, Amounts: []int{150}}
 	// itxs1 := []insideTx{}
 	// for i := 0; i < 10; i++ {
 	// 	itxs1 = append(itxs1, tx1)
 	// 	itxs1 = append(itxs1, tx2)
+	// 	itxs1 = append(itxs1, tx3)
+	// 	itxs1 = append(itxs1, tx4)
 	// }
 	// atxs1 := convertInsideTxs(itxs1)
 	// executeTxs(serverURLs, atxs1)
-	//
-	// tx3 := insideTx{From: 2, To: []int{3}, Amounts: []int{150}}
-	// tx4 := insideTx{From: 3, To: []int{2}, Amounts: []int{150}}
-	// itxs2 := []insideTx{}
-	// for i := 0; i < 10; i++ {
-	// 	itxs2 = append(itxs2, tx3)
-	// 	itxs2 = append(itxs2, tx4)
-	// }
-	// atxs2 := convertInsideTxs(itxs2)
-	// executeTxs(serverURLs, atxs2)
 
 	// case 4: random -> random
 	// mrand.Seed(time.Now().UnixNano())

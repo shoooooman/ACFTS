@@ -23,14 +23,8 @@ func ReceiveUTXO(db *gorm.DB) gin.HandlerFunc {
 
 		// FIXME: 1つ1つのUTXOの署名を検証する
 		for _, utxo := range j.UTXOs {
-			// log.Printf("utxo #%d is creating\n", i)
 			db.Create(&utxo)
-			// log.Printf("utxo #%d is created\n", i)
-			// jsonBytes, _ := json.MarshalIndent(utxo, "", "    ")
-			// log.Println(string(jsonBytes))
 		}
-
-		// log.Println("created utxos")
 
 		c.JSON(http.StatusCreated, gin.H{
 			"message": "Received a utxo.",

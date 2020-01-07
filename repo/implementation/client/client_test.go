@@ -16,12 +16,7 @@ import (
 )
 
 func benchmarkSetup(srvURLs []string, numClusters, numClients, gOwner int) []model.Address {
-	// fmt.Printf("Input client number: ")
-	// var num int
-	// fmt.Scan(&num)
-	//
-	// fmt.Println("before: " + strconv.Itoa(num)) // 0
-
+	// Cluster number
 	num := 0
 	db = initDB(num)
 
@@ -61,10 +56,6 @@ func benchmarkSetup(srvURLs []string, numClusters, numClients, gOwner int) []mod
 		body := _delete(url)
 		log.Printf("Delete: %v\n", string(body))
 	}
-
-	// fmt.Println("Input something when all clusters have been registered by all servers.")
-	// var dummy string
-	// fmt.Scan(&dummy)
 
 	collectOtherAddrs(otherClients)
 
