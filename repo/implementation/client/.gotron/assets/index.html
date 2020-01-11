@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ACFTS</title>
+</head>
+
+<body>
+
+<form name="form1">
+  <input name="number" type="number">
+  <button type="button" onclick="location.href='./request.html'" onClick="inputClusterNumber()">OK</button>
+</form>
+
+<script>
+  const ws = new WebSocket("ws://localhost:" + global.backendPort + "/web/app/events");
+  console.log("Setup web socket:", ws);
+
+  function inputClusterNumber() {
+    const form1 = document.forms.form1
+    ws.send(JSON.stringify({
+    "event": "config",
+        "message": "Hello World!",
+        "number": form1.from.value,
+    }))
+    console.log("Send success!!");
+  }
+</script>
+
+</body>
+</html>

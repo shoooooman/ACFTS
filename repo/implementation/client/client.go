@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Equanox/gotron"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 
@@ -700,6 +701,9 @@ func getAllAddrs() []model.Address {
 	return addrs
 }
 
+func setupGUI() {
+}
+
 var db *gorm.DB
 
 // FIXME: DBに秘密鍵と公開鍵を保存する
@@ -719,9 +723,71 @@ func main() {
 		"http://localhost:8083",
 	}
 
-	fmt.Printf("Input cluster number: ")
+	/* Setup GUI */
+	window, err := gotron.New("webapp")
+	if err != nil {
+		panic(err)
+	}
+
+	window.WindowOptions.Width = 1200
+	window.WindowOptions.Height = 980
+	window.WindowOptions.Title = "Gotron"
+
+	done, err := window.Start()
+	if err != nil {
+		panic(err)
+	}
+
+	window.OpenDevTools()
+
+	// Create a custom event struct that has a pointer to gotron.Event
+	type CustomEvent struct {
+		*gotron.Event
+		CustomAttribute string `json:"AtrNameInFrontend"`
+	}
+
+	req := struct {
+		Message string `json:"message"`
+		From    string `json:"from"`
+		To      string `json:"to"`
+		Amount  string `json:"coin"`
+	}{}
+
+	window.On(&gotron.Event{Event: "request"}, func(bin []byte) {
+		buf := bytes.NewBuffer(bin)
+		fmt.Println(buf)
+		err := json.Unmarshal(bin, &req)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(req)
+
+		window.Send(&CustomEvent{
+			Event:           &gotron.Event{Event: "event-name"},
+			CustomAttribute: "Send back!",
+		})
+	})
+
+	config := struct {
+		Message string `json:"message"`
+		Number  string `json:"number"`
+	}{}
+
 	var num int
-	fmt.Scan(&num)
+	window.On(&gotron.Event{Event: "config"}, func(bin []byte) {
+		buf := bytes.NewBuffer(bin)
+		fmt.Println(buf)
+		err := json.Unmarshal(bin, &req)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(req)
+		num, _ = strconv.Atoi(config.Number)
+	})
+
+	// fmt.Printf("Input cluster number: ")
+	// var num int
+	// fmt.Scan(&num)
 	db = initDB(num)
 	defer db.Close()
 
@@ -869,4 +935,6 @@ L_FOR:
 	// Wait for receiving outputs of this cluster
 	// for {
 	// }
+
+	<-done
 }

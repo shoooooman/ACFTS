@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ACFTS</title>
+</head>
+
+<body>
+
+<form name="request">
+  <input name="from" type="text">
+  <input name="to" type="text">
+  <input name="coin" type="number">
+  <button type="button" onClick="sendRequest()">Send</button>
+</form>
+
+<script>
+  const ws = new WebSocket("ws://localhost:" + global.backendPort + "/web/app/events");
+  console.log("Setup web socket:", ws);
+
+  function sendRequest() {
+    const request = document.forms.request
+    ws.send(JSON.stringify({
+    "event": "request",
+        "message": "Hello World!",
+        "from": request.from.value,
+        "to": request.to.value,
+        "coin": request.coin.value,
+    }))
+    console.log("Send success!!");
+  }
+
+  ws.onmessage = (message) => {
+    let obj = JSON.parse(message.data);
+    // event name
+    console.log(obj.event);
+    // event data
+    console.log(obj.AtrNameInFrontend);
+  }
+</script>
+
+</body>
+</html>
