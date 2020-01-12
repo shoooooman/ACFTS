@@ -11,30 +11,39 @@
 <body>
 
 <div class="container">
-  <form name="form1">
-    <div class="form-group">
-      <label for="cluster">Input cluster ID:</label>
-      <input type="number" name="cluster" id="cluster">
+  <form name="form1" class="pt-5">
+    <div class="form-group row">
+      <label for="cluster" class="col-sm-4 col-form-label">Cluster ID:</label>
+      <div class="col-sm-2">
+        <input type="number" name="cluster" id="cluster" class="form-control">
+      </div>
     </div>
-    <div class="form-group">
-      <label for="address">Input the number of addresses:</label>
-      <input type="number" name="address" id="address">
+    <div class="form-group row">
+      <label for="address" class="col-sm-4 col-form-label">The number of addresses:</label>
+      <div class="col-sm-2">
+        <input type="number" name="address" id="address" class="form-control">
+      </div>
     </div>
-    <div class="form-group">
-      <label for="all">Input the number of all clusters:</label>
-      <input type="number" name="all" id="all">
+    <div class="form-group row">
+      <label for="all" class="col-sm-4 col-form-label">The number of all clusters:</label>
+      <div class="col-sm-2">
+        <input type="number" name="all" id="all" class="form-control">
+      </div>
     </div>
-    <div class="form-check form-check-inline">
-        <input class="form-check-input" type="radio" name="genesis" id="radio1" value="true">
-        <label class="form-check-label" for="radio1">Yes</label>
+    <div class="form-group row">
+      <legend class="col-sm-4 col-form-label pt-0">Does it have the genesis?</legend>
+      <div class="col-sm-15">
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="genesis" id="radio1" value="true">
+          <label class="form-check-label" for="radio1">Yes</label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="genesis" id="radio2" value="false" checked>
+          <label class="form-check-label" for="radio2">No</label>
+        </div>
+      </div>
     </div>
-    <div class="form-check form-check-inline">
-        <input class="form-check-input" type="radio" name="genesis" id="radio2" value="false" checked>
-        <label class="form-check-label" for="radio2">No</label>
-    </div>
-    <button type="button" onClick="configCluster()" class="btn btn-primary">
-        Next
-    </button>
+    <button type="button" onClick="configCluster()" class="btn btn-primary">Next</button>
   </form>
 </div>
 

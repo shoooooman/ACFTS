@@ -17,8 +17,7 @@ func getBalance(db *gorm.DB, addr model.Address) int {
 	return balance
 }
 
-func getTotalBalance(db *gorm.DB, numClients int) int {
-	addrs := getAllAddrs(db)
+func getTotalBalance(db *gorm.DB, addrs []model.Address, numClients int) int {
 	sum := 0
 	for i := 0; i < numClients; i++ {
 		sum += getBalance(db, addrs[i])
@@ -55,15 +54,22 @@ func ReceiveUTXO(db *gorm.DB, window *gotron.BrowserWindow, numClients int) gin.
 			db.Create(&utxo)
 		}
 
-		sum := getTotalBalance(db, numClients)
-		t := struct {
-			*gotron.Event
-			Total int `json:"total"`
-		}{
-			Event: &gotron.Event{Event: "total"},
-			Total: sum,
+		addrs := getAllAddrs(db)
+		sum := getTotalBalance(db, addrs, numClients)
+		balances := make([]int, numClients)
+		for i := 0; i < numClients; i++ {
+			balances[i] = getBalance(db, addrs[i])
 		}
-		window.Send(&t)
+		b := struct {
+			*gotron.Event
+			Total    int   `json:"total"`
+			Balances []int `json:"balances"`
+		}{
+			Event:    &gotron.Event{Event: "balance"},
+			Total:    sum,
+			Balances: balances,
+		}
+		window.Send(&b)
 
 		c.JSON(http.StatusCreated, gin.H{
 			"message": "Received a utxo.",

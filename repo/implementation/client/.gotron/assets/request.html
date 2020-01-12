@@ -6,14 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>ACFTS</title>
   <link rel="stylesheet" href="css/bootstrap.css">
+  <style>
+    label {
+        font-size: 18px;
+    }
+  </style>
 </head>
 
 <body>
 
 <div class="container">
-  <div>
-    <h3>Total</h3>
-    <p id="total">0</p>
+  <div class="d-flex flex-row pt-5">
+    <h3 class="mr-2">Total: </h3>
+    <h3 id="total">0</h3>
   </div>
   <form name="request">
     <div class="form-group">
@@ -24,13 +29,12 @@
     </div>
     <div class="form-group">
       <label for="to">To</label>
-      <!-- <input type="text" name="to" id="to" class="form&#45;control"> -->
       <select class="form-control" name="to" id="to">
       </select>
     </div>
     <div class="form-group">
       <label for="coin">Amount</label>
-      <input type="number" name="coin" id="coin" class="form-control">
+      <input type="number" value="0" min="0" name="coin" id="coin" class="form-control">
     </div>
     <div class="text-right">
       <button type="button" onClick="sendRequest()" class="btn btn-primary">Send</button>
@@ -48,14 +52,25 @@
     }))
   }
 
+  function cutAddress(addr, len) {
+    let shortAddr = addr;
+    if(addr.length > len) {
+      shortAddr = addr.substr(0, len);
+    }
+    return shortAddr;
+  }
+
   function setAddresses(addrs, myAddrs) {
     let sFrom = document.getElementById("from");
     let sTo = document.getElementById("to");
     for(let i = 0; i < addrs.length; i++) {
       let option1 = document.createElement("option")
       let option2 = document.createElement("option")
-      option1.text = addrs[i].address1 + addrs[i].address2;
-      option2.text = addrs[i].address1 + addrs[i].address2;
+      const addr = addrs[i].address1 + addrs[i].address2;
+      const len = 40;
+      const shortAddr = cutAddress(addr, len);
+      option1.text = shortAddr + "..., 0";
+      option2.text = shortAddr + "...";
       option1.value = i;
       option2.value = i;
       if(i < myAddrs) {
@@ -65,13 +80,20 @@
     }
   }
 
-  function setTotal(total) {
-    let p = document.getElementById("total")
-    p.textContent = total
+  function setBalances(total, balances) {
+    let p = document.getElementById("total");
+    p.textContent = total;
+    let sFrom = document.getElementById("from");
+    let children = sFrom.childNodes;
+    for(let i = 1; i < children.length; i++) {
+      let child = children[i].text;
+      const index = child.search(", ");
+      children[i].textContent = child.substr(0, index+2) + balances[i-1];
+    }
   }
 
   function sendRequest() {
-    const request = document.forms.request
+    const request = document.forms.request;
     ws.send(JSON.stringify({
     "event": "request",
         "from": parseInt(request.from.value),
@@ -89,9 +111,10 @@
       console.log(obj.addresses);
       console.log(obj.myAddresses);
       setAddresses(obj.addresses, parseInt(obj.myAddresses))
-    } else if(obj.event == 'total') {
-      console.log(obj.total)
-      setTotal(parseInt(obj.total))
+    } else if(obj.event == 'balance') {
+      console.log(obj.total);
+      console.log(obj.balances);
+      setBalances(parseInt(obj.total), obj.balances);
     }
   }
 </script>

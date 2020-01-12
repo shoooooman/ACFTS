@@ -868,14 +868,20 @@ func main() {
 	}
 
 	sum := getTotalBalance(addrs, numClients)
-	t := struct {
-		*gotron.Event
-		Total int `json:"total"`
-	}{
-		Event: &gotron.Event{Event: "total"},
-		Total: sum,
+	balances := make([]int, numClients)
+	for i := 0; i < numClients; i++ {
+		balances[i] = getBalance(addrs[i])
 	}
-	window.Send(&t)
+	b := struct {
+		*gotron.Event
+		Total    int   `json:"total"`
+		Balances []int `json:"balances"`
+	}{
+		Event:    &gotron.Event{Event: "balance"},
+		Total:    sum,
+		Balances: balances,
+	}
+	window.Send(&b)
 
 	/* Make sample transactions */
 	// Create a custom event struct that has a pointer to gotron.Event
@@ -908,14 +914,20 @@ func main() {
 		executeTxs(serverURLs, atxs)
 
 		sum := getTotalBalance(addrs, numClients)
-		t := struct {
-			*gotron.Event
-			Total int `json:"total"`
-		}{
-			Event: &gotron.Event{Event: "total"},
-			Total: sum,
+		balances := make([]int, numClients)
+		for i := 0; i < numClients; i++ {
+			balances[i] = getBalance(addrs[i])
 		}
-		window.Send(&t)
+		b := struct {
+			*gotron.Event
+			Total    int   `json:"total"`
+			Balances []int `json:"balances"`
+		}{
+			Event:    &gotron.Event{Event: "balance"},
+			Total:    sum,
+			Balances: balances,
+		}
+		window.Send(&b)
 	})
 
 	/* Use generalTx */
