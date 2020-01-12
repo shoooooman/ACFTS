@@ -1,30 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>ACFTS</title>
+  <link rel="stylesheet" href="css/bootstrap.css">
 </head>
 
 <body>
 
-<form name="request">
-  <input name="from" type="text">
-  <input name="to" type="text">
-  <input name="coin" type="number">
-  <button type="button" onClick="sendRequest()">Send</button>
-</form>
+<div class="container">
+  <form name="request">
+    <div class="form-group">
+      <label for="from">From</label>
+      <!-- <input type="text" name="from" id="from" class="form&#45;control"> -->
+      <select class="form-control" name="from" id="from">
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="to">To</label>
+      <!-- <input type="text" name="to" id="to" class="form&#45;control"> -->
+      <select class="form-control" name="to" id="to">
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="coin">Amount</label>
+      <input type="number" name="coin" id="coin" class="form-control">
+    </div>
+    <div class="text-right">
+      <button type="button" onClick="sendRequest()" class="btn btn-primary">Send</button>
+    </div>
+  </form>
+</div>
 
 <script>
   const ws = new WebSocket("ws://localhost:" + global.backendPort + "/web/app/events");
   console.log("Setup web socket:", ws);
 
+  ws.onopen = (e) => {
+    ws.send(JSON.stringify({
+    "event": "begin-req",
+    }))
+  }
+
+  function setAddresses(addrs, myAddrs) {
+    let sFrom = document.getElementById("from");
+    let sTo = document.getElementById("to");
+    for(let i = 0; i < addrs.length; i++) {
+      let option1 = document.createElement("option")
+      let option2 = document.createElement("option")
+      option1.text = addrs[i].address1 + addrs[i].address2;
+      option2.text = addrs[i].address1 + addrs[i].address2;
+      option1.value = i;
+      option2.value = i;
+      if(i < myAddrs) {
+        sFrom.appendChild(option1);
+      }
+      sTo.appendChild(option2);
+    }
+  }
+
   function sendRequest() {
     const request = document.forms.request
     ws.send(JSON.stringify({
     "event": "request",
-        "message": "Hello World!",
         "from": request.from.value,
         "to": request.to.value,
-        "coin": request.coin.value,
+        "coin": parseInt(request.coin.value),
     }))
     console.log("Send success!!");
   }
@@ -33,10 +76,15 @@
     let obj = JSON.parse(message.data);
     // event name
     console.log(obj.event);
-    // event data
-    console.log(obj.AtrNameInFrontend);
+    if(obj.event == 'addrs') {
+      console.log(obj.addresses);
+      console.log(obj.myAddresses);
+      setAddresses(obj.addresses, parseInt(obj.myAddresses))
+    }
   }
 </script>
 
+<script src="js/jquery-3.4.1.js"></script>
+<script src="js/bootstrap.bundle.js"></script>
 </body>
 </html>

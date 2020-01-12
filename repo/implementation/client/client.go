@@ -740,6 +740,32 @@ func main() {
 
 	window.OpenDevTools()
 
+	config := struct {
+		Cluster int  `json:"cluster"`
+		Client  int  `json:"address"`
+		All     int  `json:"all"`
+		Genesis bool `json:"genesis"`
+	}{}
+
+	var num int
+	var numClients int
+	var numClusters int
+	var hasGenesis bool
+	c := make(chan bool)
+	window.On(&gotron.Event{Event: "config"}, func(bin []byte) {
+		buf := bytes.NewBuffer(bin)
+		fmt.Println(buf)
+		err := json.Unmarshal(bin, &config)
+		if err != nil {
+			fmt.Println(err)
+		}
+		num = config.Cluster
+		numClients = config.Client
+		numClusters = config.All
+		hasGenesis = config.Genesis
+		c <- true
+	})
+
 	// Create a custom event struct that has a pointer to gotron.Event
 	type CustomEvent struct {
 		*gotron.Event
@@ -747,10 +773,9 @@ func main() {
 	}
 
 	req := struct {
-		Message string `json:"message"`
-		From    string `json:"from"`
-		To      string `json:"to"`
-		Amount  string `json:"coin"`
+		From   string `json:"from"`
+		To     string `json:"to"`
+		Amount int    `json:"coin"`
 	}{}
 
 	window.On(&gotron.Event{Event: "request"}, func(bin []byte) {
@@ -768,23 +793,17 @@ func main() {
 		})
 	})
 
-	config := struct {
-		Message string `json:"message"`
-		Number  string `json:"number"`
-	}{}
-
-	var num int
-	window.On(&gotron.Event{Event: "config"}, func(bin []byte) {
-		buf := bytes.NewBuffer(bin)
-		fmt.Println(buf)
-		err := json.Unmarshal(bin, &req)
-		if err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println(req)
-		num, _ = strconv.Atoi(config.Number)
+	rdy := make(chan bool)
+	window.On(&gotron.Event{Event: "ready"}, func(bin []byte) {
+		rdy <- true
 	})
 
+	br := make(chan bool)
+	window.On(&gotron.Event{Event: "begin-req"}, func(bin []byte) {
+		br <- true
+	})
+
+	<-c
 	// fmt.Printf("Input cluster number: ")
 	// var num int
 	// fmt.Scan(&num)
@@ -798,7 +817,7 @@ func main() {
 	cBase := "http://localhost"
 
 	// Generate private keys
-	const numClients = 4
+	// const numClients = 4
 	myurl := cBase + ":" + strconv.Itoa(port)
 	generateClients(numClients, myurl)
 
@@ -809,38 +828,54 @@ func main() {
 
 	r := initRoute(db)
 	go r.Run(":" + strconv.Itoa(port))
-	// r.Run(":" + strconv.Itoa(port))
 
-	const numClusters = 1
+	// const numClusters = 1
 	otherClients := getOtherCURLs(cBase, numClusters, num)
 
-	fmt.Println("Input something when all clusters have been registered by all servers.")
-	var dummy string
-	fmt.Scan(&dummy)
+	<-rdy
+	// fmt.Println("Input something when all clusters have been registered by all servers.")
+	// var dummy string
+	// fmt.Scan(&dummy)
 
 	collectOtherAddrs(otherClients)
 
+	<-br
 	addrs := getAllAddrs()
 	log.Println(addrs)
 
+	data := struct {
+		*gotron.Event
+		Addrs   []model.Address `json:"addresses"`
+		MyAddrs int             `json:"myAddresses"`
+	}{
+		Event:   &gotron.Event{Event: "addrs"},
+		Addrs:   addrs,
+		MyAddrs: numClients,
+	}
+	window.Send(&data)
+
 	/* Make the genesis */
-L_FOR:
-	for {
-		fmt.Println("Have a genesis?")
-		fmt.Println("1. yes")
-		fmt.Println("2. no")
-		var g int
-		fmt.Scan(&g)
-		switch g {
-		case 1:
-			owner := addrs[0]
-			createGenesis(serverURLs, owner, 200)
-			break L_FOR
-		case 2:
-			break L_FOR
-		default:
-			fmt.Println("Please input valid number.")
-		}
+	// L_FOR:
+	// 	for {
+	// 		fmt.Println("Have a genesis?")
+	// 		fmt.Println("1. yes")
+	// 		fmt.Println("2. no")
+	// 		var g int
+	// 		fmt.Scan(&g)
+	// 		switch g {
+	// 		case 1:
+	// 			owner := addrs[0]
+	// 			createGenesis(serverURLs, owner, 200)
+	// 			break L_FOR
+	// 		case 2:
+	// 			break L_FOR
+	// 		default:
+	// 			fmt.Println("Please input valid number.")
+	// 		}
+	// 	}
+	if hasGenesis {
+		owner := addrs[0]
+		createGenesis(serverURLs, owner, 200)
 	}
 
 	/* Make sample transactions */
@@ -848,10 +883,10 @@ L_FOR:
 	/* Use generalTx */
 
 	// Inside one cluster
-	atxs := []generalTx{
-		{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{200}},
-	}
-	executeTxs(serverURLs, atxs)
+	// atxs := []generalTx{
+	// 	{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{200}},
+	// }
+	// executeTxs(serverURLs, atxs)
 
 	// atxs := make([]generalTx, 200)
 	// tx := generalTx{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{1}}

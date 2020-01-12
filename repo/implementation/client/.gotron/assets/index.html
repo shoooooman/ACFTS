@@ -1,30 +1,62 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>ACFTS</title>
+  <link rel="stylesheet" href="css/bootstrap.css">
 </head>
 
 <body>
 
-<form name="form1">
-  <input name="number" type="number">
-  <button type="button" onclick="location.href='./request.html'" onClick="inputClusterNumber()">OK</button>
-</form>
+<div class="container">
+  <form name="form1">
+    <div class="form-group">
+      <label for="cluster">Input cluster ID:</label>
+      <input type="number" name="cluster" id="cluster">
+    </div>
+    <div class="form-group">
+      <label for="address">Input the number of addresses:</label>
+      <input type="number" name="address" id="address">
+    </div>
+    <div class="form-group">
+      <label for="all">Input the number of all clusters:</label>
+      <input type="number" name="all" id="all">
+    </div>
+    <div class="form-check form-check-inline">
+        <input class="form-check-input" type="radio" name="genesis" id="radio1" value="true">
+        <label class="form-check-label" for="radio1">Yes</label>
+    </div>
+    <div class="form-check form-check-inline">
+        <input class="form-check-input" type="radio" name="genesis" id="radio2" value="false" checked>
+        <label class="form-check-label" for="radio2">No</label>
+    </div>
+    <button type="button" onClick="configCluster()" class="btn btn-primary">
+        Next
+    </button>
+  </form>
+</div>
 
 <script>
   const ws = new WebSocket("ws://localhost:" + global.backendPort + "/web/app/events");
   console.log("Setup web socket:", ws);
 
-  function inputClusterNumber() {
+  function configCluster() {
     const form1 = document.forms.form1
     ws.send(JSON.stringify({
     "event": "config",
-        "message": "Hello World!",
-        "number": form1.from.value,
+        "cluster": parseInt(form1.cluster.value),
+        "address": parseInt(form1.address.value),
+        "all": parseInt(form1.all.value),
+        "genesis": form1.genesis.value === 'true',
     }))
     console.log("Send success!!");
+    location.href = "./ready.html"
   }
 </script>
 
+<script src="js/jquery-3.4.1.js"></script>
+<script src="js/bootstrap.bundle.js"></script>
 </body>
 </html>
