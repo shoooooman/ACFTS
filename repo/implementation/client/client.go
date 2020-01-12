@@ -70,12 +70,12 @@ func deleteAll(db *gorm.DB) {
 	db.Model(&model.Signature{}).AddIndex("idx_signature", "output_id")
 }
 
-func initRoute(db *gorm.DB) *gin.Engine {
+func initRoute(db *gorm.DB, window *gotron.BrowserWindow, numClients int) *gin.Engine {
 	r := gin.Default()
 
 	// APIs
 	r.GET("/address", api.GetAddrs(db))
-	r.POST("/output", api.ReceiveUTXO(db))
+	r.POST("/output", api.ReceiveUTXO(db, window, numClients))
 	r.DELETE("/output", api.ClearOutputs(db))
 
 	return r
@@ -704,6 +704,22 @@ func getAllAddrs() []model.Address {
 func setupGUI() {
 }
 
+func getBalance(addr model.Address) int {
+	var balance int
+	db.Table("outputs").
+		Where("address1 = ? AND address2 = ? AND used = false", addr.Address1, addr.Address2).
+		Select("sum(amount)").Row().Scan(&balance)
+	return balance
+}
+
+func getTotalBalance(addrs []model.Address, numClients int) int {
+	sum := 0
+	for i := 0; i < numClients; i++ {
+		sum += getBalance(addrs[i])
+	}
+	return sum
+}
+
 var db *gorm.DB
 
 // FIXME: DBに秘密鍵と公開鍵を保存する
@@ -766,33 +782,6 @@ func main() {
 		c <- true
 	})
 
-	// Create a custom event struct that has a pointer to gotron.Event
-	type CustomEvent struct {
-		*gotron.Event
-		CustomAttribute string `json:"AtrNameInFrontend"`
-	}
-
-	req := struct {
-		From   string `json:"from"`
-		To     string `json:"to"`
-		Amount int    `json:"coin"`
-	}{}
-
-	window.On(&gotron.Event{Event: "request"}, func(bin []byte) {
-		buf := bytes.NewBuffer(bin)
-		fmt.Println(buf)
-		err := json.Unmarshal(bin, &req)
-		if err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println(req)
-
-		window.Send(&CustomEvent{
-			Event:           &gotron.Event{Event: "event-name"},
-			CustomAttribute: "Send back!",
-		})
-	})
-
 	rdy := make(chan bool)
 	window.On(&gotron.Event{Event: "ready"}, func(bin []byte) {
 		rdy <- true
@@ -826,7 +815,7 @@ func main() {
 		log.Println(http.ListenAndServe("localhost:7000", nil))
 	}()
 
-	r := initRoute(db)
+	r := initRoute(db, window, numClients)
 	go r.Run(":" + strconv.Itoa(port))
 
 	// const numClusters = 1
@@ -878,7 +867,56 @@ func main() {
 		createGenesis(serverURLs, owner, 200)
 	}
 
+	sum := getTotalBalance(addrs, numClients)
+	t := struct {
+		*gotron.Event
+		Total int `json:"total"`
+	}{
+		Event: &gotron.Event{Event: "total"},
+		Total: sum,
+	}
+	window.Send(&t)
+
 	/* Make sample transactions */
+	// Create a custom event struct that has a pointer to gotron.Event
+	type CustomEvent struct {
+		*gotron.Event
+		CustomAttribute string `json:"AtrNameInFrontend"`
+	}
+
+	req := struct {
+		From   int `json:"from"`
+		To     int `json:"to"`
+		Amount int `json:"coin"`
+	}{}
+
+	window.On(&gotron.Event{Event: "request"}, func(bin []byte) {
+		buf := bytes.NewBuffer(bin)
+		fmt.Println(buf)
+		err := json.Unmarshal(bin, &req)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(req)
+
+		from := addrs[req.From]
+		to := addrs[req.To]
+		amount := req.Amount
+		atxs := []generalTx{
+			{From: from, To: []model.Address{to}, Amounts: []int{amount}},
+		}
+		executeTxs(serverURLs, atxs)
+
+		sum := getTotalBalance(addrs, numClients)
+		t := struct {
+			*gotron.Event
+			Total int `json:"total"`
+		}{
+			Event: &gotron.Event{Event: "total"},
+			Total: sum,
+		}
+		window.Send(&t)
+	})
 
 	/* Use generalTx */
 

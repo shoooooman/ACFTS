@@ -4,12 +4,41 @@ import (
 	"acfts-client/model"
 	"net/http"
 
+	"github.com/Equanox/gotron"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 )
 
+func getBalance(db *gorm.DB, addr model.Address) int {
+	var balance int
+	db.Table("outputs").
+		Where("address1 = ? AND address2 = ? AND used = false", addr.Address1, addr.Address2).
+		Select("sum(amount)").Row().Scan(&balance)
+	return balance
+}
+
+func getTotalBalance(db *gorm.DB, numClients int) int {
+	addrs := getAllAddrs(db)
+	sum := 0
+	for i := 0; i < numClients; i++ {
+		sum += getBalance(db, addrs[i])
+	}
+	return sum
+}
+
+func getAllAddrs(db *gorm.DB) []model.Address {
+	clients := []model.Client{}
+	db.Find(&clients)
+	addrs := make([]model.Address, len(clients))
+	for i, client := range clients {
+		addrs[i] = client.Address
+	}
+
+	return addrs
+}
+
 // ReceiveUTXO is
-func ReceiveUTXO(db *gorm.DB) gin.HandlerFunc {
+func ReceiveUTXO(db *gorm.DB, window *gotron.BrowserWindow, numClients int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// log.Println("received utxos")
 		j := struct {
@@ -25,6 +54,16 @@ func ReceiveUTXO(db *gorm.DB) gin.HandlerFunc {
 		for _, utxo := range j.UTXOs {
 			db.Create(&utxo)
 		}
+
+		sum := getTotalBalance(db, numClients)
+		t := struct {
+			*gotron.Event
+			Total int `json:"total"`
+		}{
+			Event: &gotron.Event{Event: "total"},
+			Total: sum,
+		}
+		window.Send(&t)
 
 		c.JSON(http.StatusCreated, gin.H{
 			"message": "Received a utxo.",
