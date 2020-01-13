@@ -34,13 +34,19 @@
       <legend class="col-sm-4 col-form-label pt-0">Does it have the genesis?</legend>
       <div class="col-sm-15">
         <div class="form-check form-check-inline">
-          <input class="form-check-input" type="radio" name="genesis" id="radio1" value="true">
+          <input class="form-check-input" type="radio" name="genesis" id="radio1" value="true" onclick="visible()" checked>
           <label class="form-check-label" for="radio1">Yes</label>
         </div>
         <div class="form-check form-check-inline">
-          <input class="form-check-input" type="radio" name="genesis" id="radio2" value="false" checked>
+          <input class="form-check-input" type="radio" name="genesis" id="radio2" value="false" onclick="invisible()">
           <label class="form-check-label" for="radio2">No</label>
         </div>
+      </div>
+    </div>
+    <div class="form-group row" id="form-gamount">
+      <label for="gamout" class="col-sm-4 col-form-label">The amount of the genesis:</label>
+      <div class="col-sm-2">
+        <input type="number" name="gamount" id="gamount" class="form-control">
       </div>
     </div>
     <button type="button" onClick="configCluster()" class="btn btn-primary">Next</button>
@@ -59,9 +65,18 @@
         "address": parseInt(form1.address.value),
         "all": parseInt(form1.all.value),
         "genesis": form1.genesis.value === 'true',
+        "gamount": parseInt(form1.gamount.value),
     }))
     console.log("Send success!!");
     location.href = "./ready.html"
+  }
+
+  function visible() {
+    document.getElementById("form-gamount").style.visibility = "visible";
+  }
+
+  function invisible() {
+    document.getElementById("form-gamount").style.visibility = "hidden";
   }
 </script>
 

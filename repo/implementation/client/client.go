@@ -761,12 +761,14 @@ func main() {
 		Client  int  `json:"address"`
 		All     int  `json:"all"`
 		Genesis bool `json:"genesis"`
+		GAmount int  `json:"gamount"`
 	}{}
 
 	var num int
 	var numClients int
 	var numClusters int
 	var hasGenesis bool
+	var gAmount int
 	c := make(chan bool)
 	window.On(&gotron.Event{Event: "config"}, func(bin []byte) {
 		buf := bytes.NewBuffer(bin)
@@ -779,6 +781,9 @@ func main() {
 		numClients = config.Client
 		numClusters = config.All
 		hasGenesis = config.Genesis
+		if hasGenesis {
+			gAmount = config.GAmount
+		}
 		c <- true
 	})
 
@@ -864,7 +869,7 @@ func main() {
 	// 	}
 	if hasGenesis {
 		owner := addrs[0]
-		createGenesis(serverURLs, owner, 200)
+		createGenesis(serverURLs, owner, gAmount)
 	}
 
 	sum := getTotalBalance(addrs, numClients)
