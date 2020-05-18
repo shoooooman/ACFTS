@@ -27,6 +27,37 @@ type GeneralTx struct {
 	Amounts []int
 }
 
+// ConvertInsideTxs converts InsideTxs to GeneralTxs
+func ConvertInsideTxs(its []InsideTx) []GeneralTx {
+	ats := make([]GeneralTx, len(its))
+	for i, it := range its {
+		fromPri := config.Keys[it.From]
+		fromPub := &fromPri.PublicKey
+		from1 := fromPub.X.String()
+		from2 := fromPub.Y.String()
+		from := model.Address{from1, from2}
+
+		to := make([]model.Address, len(it.To))
+		for j, v := range it.To {
+			toPri := config.Keys[v]
+			toPub := &toPri.PublicKey
+			t1 := toPub.X.String()
+			t2 := toPub.Y.String()
+			t := model.Address{t1, t2}
+			to[j] = t
+		}
+
+		at := GeneralTx{
+			From:    from,
+			To:      to,
+			Amounts: it.Amounts,
+		}
+		ats[i] = at
+	}
+
+	return ats
+}
+
 func getClientSig(utxo model.Output) (string, string) {
 	// Convert addresses to bytes to get its hash
 	buf := []byte(fmt.Sprintf("%v%v%v", utxo.Address1, utxo.Address2, utxo.PreviousHash))
@@ -187,36 +218,6 @@ func getPreviousHash(previous string) string {
 	bytes := sha256.Sum256([]byte(previous))
 	num := fmt.Sprintf("%x", bytes)
 	return string(num)
-}
-
-func convertInsideTxs(its []InsideTx) []GeneralTx {
-	ats := make([]GeneralTx, len(its))
-	for i, it := range its {
-		fromPri := config.Keys[it.From]
-		fromPub := &fromPri.PublicKey
-		from1 := fromPub.X.String()
-		from2 := fromPub.Y.String()
-		from := model.Address{from1, from2}
-
-		to := make([]model.Address, len(it.To))
-		for j, v := range it.To {
-			toPri := config.Keys[v]
-			toPub := &toPri.PublicKey
-			t1 := toPub.X.String()
-			t2 := toPub.Y.String()
-			t := model.Address{t1, t2}
-			to[j] = t
-		}
-
-		at := GeneralTx{
-			From:    from,
-			To:      to,
-			Amounts: it.Amounts,
-		}
-		ats[i] = at
-	}
-
-	return ats
 }
 
 func findUTXOs(addr model.Address, amount int) ([]model.Output, int) {

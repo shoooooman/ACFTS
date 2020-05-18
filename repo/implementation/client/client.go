@@ -20,5 +20,6 @@ func main() {
 		gui.InitGUI()
 	} else {
 		cui.InitCUI()
+		cui.ExecuteExamples()
 	}
 }
