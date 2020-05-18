@@ -14,7 +14,8 @@ import (
 
 // GenerateClients creates key pairs and set it to DB
 func GenerateClients(url string) {
-	db := config.DB
+	db := config.GetDB()
+
 	config.Keys = make([]*ecdsa.PrivateKey, config.NumClients)
 	config.Pub2Pri = make(map[string]*ecdsa.PrivateKey)
 
@@ -58,7 +59,8 @@ func GetOtherCURLs(num int) []string {
 // CollectOtherAddrs requests other clients for their addresses
 // and set them to DB
 func CollectOtherAddrs(others []string) {
-	db := config.DB
+	db := config.GetDB()
+
 	for _, ourl := range others {
 		url := ourl + "/address"
 		body := utils.Get(url)
@@ -87,7 +89,8 @@ func CollectOtherAddrs(others []string) {
 
 // GetAllAddrs returns all addresses including mine from DB
 func GetAllAddrs() []model.Address {
-	db := config.DB
+	db := config.GetDB()
+
 	clients := []model.Client{}
 	db.Find(&clients)
 	addrs := make([]model.Address, len(clients))

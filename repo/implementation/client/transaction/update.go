@@ -7,7 +7,8 @@ import (
 
 // FIXME: サーバー側もstruct Addressを作ったらaddr1, addr2をまとめる
 func updateOutputs(outputs []model.Output, sigs []model.Signature) {
-	db := config.DB
+	db := config.GetDB()
+
 	for _, output := range outputs {
 		// Make a record if the output is not created yet
 		cnt := 0

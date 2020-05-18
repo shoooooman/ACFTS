@@ -13,10 +13,7 @@ func InitCUI() {
 	fmt.Printf("Input cluster number: ")
 	fmt.Scan(&config.Num)
 
-	config.DB = boot.SetDB(config.Num)
-	defer config.DB.Close()
-
-	boot.DeleteAll(config.DB)
+	db := config.SetDB(config.Num)
 
 	port := config.BasePort + config.Num
 
@@ -25,7 +22,7 @@ func InitCUI() {
 	myurl := config.CBase + ":" + strconv.Itoa(port)
 	boot.GenerateClients(myurl)
 
-	r := boot.SetRouter(config.DB, nil)
+	r := boot.SetRouter(db, nil)
 	go r.Run(":" + strconv.Itoa(port))
 
 	config.NumClusters = 1

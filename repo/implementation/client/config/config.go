@@ -28,8 +28,7 @@ var (
 		// "http://localhost:8083",
 	}
 
-	// DB is
-	DB *gorm.DB
+	db *gorm.DB
 
 	// Keys is
 	// FIXME: DBに秘密鍵と公開鍵を保存する

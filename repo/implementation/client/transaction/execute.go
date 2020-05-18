@@ -10,7 +10,8 @@ import (
 
 // Execute executes transactions
 func Execute(txs []GeneralTx) {
-	db := config.DB
+	db := config.GetDB()
+
 	for i := 0; i < len(txs); i++ {
 		jsonStr, err := createJSONStr(txs[i])
 		if err != nil {

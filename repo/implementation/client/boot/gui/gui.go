@@ -74,17 +74,15 @@ func InitGUI() {
 	<-c
 	log.Println(config.Num)
 
-	config.DB = boot.SetDB(config.Num)
-	defer config.DB.Close()
-
-	boot.DeleteAll(config.DB)
+	db := config.SetDB(config.Num)
+	defer db.Close()
 
 	port := config.BasePort + config.Num
 
 	myurl := config.CBase + ":" + strconv.Itoa(port)
 	boot.GenerateClients(myurl)
 
-	r := boot.SetRouter(config.DB, window)
+	r := boot.SetRouter(db, window)
 	go r.Run(":" + strconv.Itoa(port))
 
 	otherClients := boot.GetOtherCURLs(config.Num)
@@ -115,10 +113,10 @@ func InitGUI() {
 		boot.CreateGenesis(owner, config.GAmount)
 	}
 
-	sum := getTotalBalance(addrs)
+	sum := getTotalBalance(db, addrs)
 	balances := make([]int, config.NumClients)
 	for i := 0; i < config.NumClients; i++ {
-		balances[i] = getBalance(config.DB, addrs[i])
+		balances[i] = getBalance(db, addrs[i])
 	}
 	b := struct {
 		*gotron.Event
@@ -161,10 +159,10 @@ func InitGUI() {
 		}
 		transaction.Execute(atxs)
 
-		sum := getTotalBalance(addrs)
+		sum := getTotalBalance(db, addrs)
 		balances := make([]int, config.NumClients)
 		for i := 0; i < config.NumClients; i++ {
-			balances[i] = getBalance(config.DB, addrs[i])
+			balances[i] = getBalance(db, addrs[i])
 		}
 		b := struct {
 			*gotron.Event
@@ -189,10 +187,10 @@ func getBalance(db *gorm.DB, addr model.Address) int {
 	return balance
 }
 
-func getTotalBalance(addrs []model.Address) int {
+func getTotalBalance(db *gorm.DB, addrs []model.Address) int {
 	sum := 0
 	for i := 0; i < config.NumClients; i++ {
-		sum += getBalance(config.DB, addrs[i])
+		sum += getBalance(db, addrs[i])
 	}
 	return sum
 }

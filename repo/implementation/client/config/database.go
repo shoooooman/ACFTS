@@ -1,37 +1,21 @@
-package boot
+package config
 
 import (
-	"acfts-client/api"
 	"acfts-client/model"
 	"fmt"
 	"log"
 
-	// mrand "math/rand"
-
-	"github.com/Equanox/gotron"
-	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 
 	// For gorm mysql
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
 
-// SetRouter sets apis
-func SetRouter(db *gorm.DB, window *gotron.BrowserWindow) *gin.Engine {
-	r := gin.Default()
-
-	// APIs
-	r.GET("/address", api.GetAddrs(db))
-	r.POST("/output", api.ReceiveUTXO(db, window))
-	r.DELETE("/output", api.ClearOutputs(db))
-
-	return r
-}
-
 // SetDB starts DB
 func SetDB(num int) *gorm.DB {
 	setting := fmt.Sprintf("root:@tcp(127.0.0.1:3306)/acfts_client_%d?charset=utf8&parseTime=True&loc=Local", num)
-	db, err := gorm.Open("mysql", setting)
+	var err error
+	db, err = gorm.Open("mysql", setting)
 	if err != nil {
 		log.Println("failed to connect database")
 		log.Panicln(err)
@@ -47,11 +31,21 @@ func SetDB(num int) *gorm.DB {
 		AddIndex("idx_address_hash", "address1", "address2", "previous_hash")
 	db.Model(&model.Signature{}).AddIndex("idx_signature", "output_id")
 
+	deleteAll()
+
 	return db
 }
 
-// DeleteAll deletes all data in DB
-func DeleteAll(db *gorm.DB) {
+// GetDB returns a pointer to gorm.DB
+func GetDB() *gorm.DB {
+	if db == nil {
+		log.Fatal("GetDB: DB is not set")
+	}
+	return db
+}
+
+// deleteAll deletes all data in DB
+func deleteAll() {
 	output := model.Output{}
 	signature := model.Signature{}
 	client := model.Client{}

@@ -82,7 +82,8 @@ func getClientSig(utxo model.Output) (string, string) {
 }
 
 func getServerSigs(utxo model.Output) string {
-	db := config.DB
+	db := config.GetDB()
+
 	var signatures []model.Signature
 	db.Table("signatures").Where("output_id = ?", utxo.ID).Find(&signatures)
 
@@ -108,7 +109,8 @@ func getServerSigs(utxo model.Output) string {
 }
 
 func getSiblings(utxo model.Output) string {
-	db := config.DB
+	db := config.GetDB()
+
 	var siblings []model.Output
 	db.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).Find(&siblings)
 
@@ -221,7 +223,8 @@ func getPreviousHash(previous string) string {
 }
 
 func findUTXOs(addr model.Address, amount int) ([]model.Output, int) {
-	db := config.DB
+	db := config.GetDB()
+
 	var candidates []model.Output
 	address1 := addr.Address1
 	address2 := addr.Address2

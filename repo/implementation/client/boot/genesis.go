@@ -17,7 +17,8 @@ type genesisJSON struct {
 
 // CreateGenesis creates genesis tx in DB
 func CreateGenesis(owner model.Address, amount int) {
-	db := config.DB
+	db := config.GetDB()
+
 	// Dummy signatures for genesis
 	sig := model.Signature{
 		Address: model.Address{
