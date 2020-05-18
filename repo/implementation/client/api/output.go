@@ -1,6 +1,7 @@
 package api
 
 import (
+	"acfts-client/config"
 	"acfts-client/model"
 	"net/http"
 
@@ -17,9 +18,9 @@ func getBalance(db *gorm.DB, addr model.Address) int {
 	return balance
 }
 
-func getTotalBalance(db *gorm.DB, addrs []model.Address, numClients int) int {
+func getTotalBalance(db *gorm.DB, addrs []model.Address) int {
 	sum := 0
-	for i := 0; i < numClients; i++ {
+	for i := 0; i < config.NumClients; i++ {
 		sum += getBalance(db, addrs[i])
 	}
 	return sum
@@ -37,7 +38,7 @@ func getAllAddrs(db *gorm.DB) []model.Address {
 }
 
 // ReceiveUTXO is
-func ReceiveUTXO(db *gorm.DB, window *gotron.BrowserWindow, numClients int) gin.HandlerFunc {
+func ReceiveUTXO(db *gorm.DB, window *gotron.BrowserWindow) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// log.Println("received utxos")
 		j := struct {
@@ -54,22 +55,24 @@ func ReceiveUTXO(db *gorm.DB, window *gotron.BrowserWindow, numClients int) gin.
 			db.Create(&utxo)
 		}
 
-		addrs := getAllAddrs(db)
-		sum := getTotalBalance(db, addrs, numClients)
-		balances := make([]int, numClients)
-		for i := 0; i < numClients; i++ {
-			balances[i] = getBalance(db, addrs[i])
+		if config.IsGUI {
+			addrs := getAllAddrs(db)
+			sum := getTotalBalance(db, addrs)
+			balances := make([]int, config.NumClients)
+			for i := 0; i < config.NumClients; i++ {
+				balances[i] = getBalance(db, addrs[i])
+			}
+			b := struct {
+				*gotron.Event
+				Total    int   `json:"total"`
+				Balances []int `json:"balances"`
+			}{
+				Event:    &gotron.Event{Event: "balance"},
+				Total:    sum,
+				Balances: balances,
+			}
+			window.Send(&b)
 		}
-		b := struct {
-			*gotron.Event
-			Total    int   `json:"total"`
-			Balances []int `json:"balances"`
-		}{
-			Event:    &gotron.Event{Event: "balance"},
-			Total:    sum,
-			Balances: balances,
-		}
-		window.Send(&b)
 
 		c.JSON(http.StatusCreated, gin.H{
 			"message": "Received a utxo.",
