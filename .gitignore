@@ -8,3 +8,6 @@
 *.toc
 *.bbl
 *.out
+
+.gotron/
+benchmark/
