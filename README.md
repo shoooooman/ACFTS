@@ -9,3 +9,6 @@ This repository provides a simulator of the system.
 You can get the details by reading READMEs in each directory ([client](./client) and [server](./server)).
 
 [This paper](./docs/thesis/Thesis.pdf) is written for showing the algorithms and experiment results.
+
+## Demo
+![demo](https://user-images.githubusercontent.com/32924835/82243449-99959b80-997a-11ea-9e65-2c202dda286b.gif)
