@@ -9,12 +9,6 @@ import (
 	"strconv"
 )
 
-// FIXME: この構造体いらない？
-type genesisJSON struct {
-	Message string       `json:"message"`
-	Genesis model.Output `json:"genesis"`
-}
-
 // CreateGenesis creates genesis tx in DB
 func CreateGenesis(owner model.Address, amount int) {
 	db := config.GetDB()
@@ -64,11 +58,14 @@ func CreateGenesis(owner model.Address, amount int) {
 	// Wait for responses from all servers
 	for i := 0; i < config.NumServers; i++ {
 		body := <-b
-		var g genesisJSON
-		err := json.Unmarshal(body, &g)
+		gen := struct {
+			Message string       `json:"message"`
+			Genesis model.Output `json:"genesis"`
+		}{}
+		err := json.Unmarshal(body, &gen)
 		if err != nil {
 			log.Panicln(err)
 		}
-		log.Println(g.Message)
+		log.Println(gen.Message)
 	}
 }
