@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>ACFTS</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+</head>
+
+<body>
+
+<div class="container">
+  <form name="form1" class="pt-5">
+    <div class="form-group row">
+      <label for="cluster" class="col-sm-4 col-form-label">Cluster ID:</label>
+      <div class="col-sm-2">
+        <input type="number" name="cluster" id="cluster" class="form-control">
+      </div>
+    </div>
+    <div class="form-group row">
+      <label for="address" class="col-sm-4 col-form-label">The number of addresses:</label>
+      <div class="col-sm-2">
+        <input type="number" name="address" id="address" class="form-control">
+      </div>
+    </div>
+    <div class="form-group row">
+      <label for="all" class="col-sm-4 col-form-label">The number of all clusters:</label>
+      <div class="col-sm-2">
+        <input type="number" name="all" id="all" class="form-control">
+      </div>
+    </div>
+    <div class="form-group row">
+      <legend class="col-sm-4 col-form-label pt-0">Does it have the genesis?</legend>
+      <div class="col-sm-15">
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="genesis" id="radio1" value="true" onclick="visible()" checked>
+          <label class="form-check-label" for="radio1">Yes</label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="genesis" id="radio2" value="false" onclick="invisible()">
+          <label class="form-check-label" for="radio2">No</label>
+        </div>
+      </div>
+    </div>
+    <div class="form-group row" id="form-gamount">
+      <label for="gamout" class="col-sm-4 col-form-label">The amount of the genesis:</label>
+      <div class="col-sm-2">
+        <input type="number" name="gamount" id="gamount" class="form-control">
+      </div>
+    </div>
+    <button type="button" onClick="configCluster()" class="btn btn-primary">Next</button>
+  </form>
+</div>
+
+<script>
+  const ws = new WebSocket("ws://localhost:" + global.backendPort + "/web/app/events");
+  console.log("Setup web socket:", ws);
+
+  function configCluster() {
+    const form1 = document.forms.form1
+    ws.send(JSON.stringify({
+    "event": "config",
+        "cluster": parseInt(form1.cluster.value),
+        "address": parseInt(form1.address.value),
+        "all": parseInt(form1.all.value),
+        "genesis": form1.genesis.value === 'true',
+        "gamount": parseInt(form1.gamount.value),
+    }))
+    console.log("Send success!!");
+    location.href = "./ready.html"
+  }
+
+  function visible() {
+    document.getElementById("form-gamount").style.visibility = "visible";
+  }
+
+  function invisible() {
+    document.getElementById("form-gamount").style.visibility = "hidden";
+  }
+</script>
+
+<script src="js/jquery-3.4.1.js"></script>
+<script src="js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

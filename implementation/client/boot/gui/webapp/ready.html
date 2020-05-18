@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>ACFTS</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+</head>
+
+<body>
+
+<div class="container">
+  <div class="mx-auto pt-5">
+    <button type="button" onClick="ready()" class="btn btn-primary">
+      Ready!
+    </button>
+  </div>
+</div>
+
+<script>
+  const ws = new WebSocket("ws://localhost:" + global.backendPort + "/web/app/events");
+  console.log("Setup web socket:", ws);
+
+  function ready() {
+    ws.send(JSON.stringify({
+    "event": "ready",
+    }))
+    console.log("Send success!!");
+    location.href = "./request.html"
+  }
+</script>
+
+<script src="js/jquery-3.4.1.js"></script>
+<script src="js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
