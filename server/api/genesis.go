@@ -1,18 +1,13 @@
 package api
 
 import (
+	"acfts/api/utils"
 	"acfts/db/model"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 )
-
-// key is a private key of this server
-var key *ecdsa.PrivateKey
 
 // CreateGenesis makes a genesis transaction
 func CreateGenesis(db *gorm.DB) gin.HandlerFunc {
@@ -20,12 +15,6 @@ func CreateGenesis(db *gorm.DB) gin.HandlerFunc {
 		genesis := model.Output{}
 		db.Where("previous_hash = ?", "genesis").First(&genesis)
 		if db.NewRecord(genesis) {
-			var err error
-			key, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-			if err != nil {
-				panic(err)
-			}
-
 			var output model.Output
 			c.BindJSON(&output)
 
@@ -39,7 +28,7 @@ func CreateGenesis(db *gorm.DB) gin.HandlerFunc {
 			}
 			db.Create(&genesis)
 
-			json := convertOutput(genesis)
+			json := utils.ConvertOutput(genesis)
 			c.JSON(http.StatusCreated, gin.H{
 				"message": "Genesis is created.",
 				"genesis": json,
