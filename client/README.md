@@ -14,80 +14,78 @@ mysql> create database acfts_client_0
 
 ```
 $ go run client.go
-Input cluster number: 0
 ...
 [GIN-debug] Listening and serving HTTP on :3000/
 ```
 
 ## Usage
 
-You can create a request of a new transaction with  `struct generalTx`.
+You can switch the GUI mode and CUI mode by changing `IsGUI` in  `config/config.go`.
 
-### generalTx
+### GUI Mode
 
-`generalTx` is a golang struct.
+If you choose the GUI mode, a gotron browser will open after running the command.
+
+You may run as much clients as you want, but make sure that each client waits for everyone else to finish the configuration pages. If all the clients finish the configuration page, please press the ready button and start making transactions!
+
+### CUI Mode
+
+If you are intersted in making transaction manually, you should use the CUI mode.
+
+You can create a request of a new transaction by writing a query in `boot/cui/example.go`.
+
+There are two types of transactions, which are `transaction.GeneralTx` and `transaction.InsideTx`.
+
+#### GeneralTx
+
+`GeneralTx` is defined in `transaction/request.go`.
 
 ```go
-type generalTx struct {
+type GeneralTx struct {
 	From    model.Address
 	To      []model.Address
 	Amounts []int
 }
 ```
 
-You can designate the sender (`From`), the receivers (`To`) and amounts for each receiver (`Amounts`).
+You can designate the sender (`From`), the receivers (`To`) and amounts for each receiver (`Amounts`). The orders of `To` and `Amounts` must correspond to each other.
 
-The orders of `To` and `Amounts` must correspond to each other.
+#### InsideTx
 
-### insideTx
-
-If you want to make a transaction inside a cluster, you can use `insideTx` instead of `generalTx`.
+On the other hand, `InsideTx` represents a transaction inside one cluster, which is also defined in `transaction/request.go`.
 
 ```go
-type insideTx struct {
+type InsideTx struct {
 	From    int
 	To      []int
 	Amounts []int
 }
 ```
 
-`insedeTx` has `From`, `To` and `Amounts` as well as `generalTx`, but the types of the first two are not `model.Address`, but `int` for simplicity.
+`InsedeTx` has `From`, `To` and `Amounts` as well as `GeneralTx`, but the types of the first two are not `model.Address`, but `int` for simplicity. It means you can designate the sender and the receivers by the client indices in one cluster.
 
-It means you can designate the sender and the receivers by the client indexes in one cluster.
+You need to convert `InsideTx` to `GeneralTx` with `transaction.ConvertInsideTxs` before making a request as the following step.
 
-You can convert `insideTx` to `generalTx` with `convertInsideTxs()`.
+#### Execution
 
-### Execution
+In `boot/cui/example.go`, queries can be written in the following format. 
 
-You generate clients in each cluster with `	generateClients(numClients, myurl)`.
-
-Then, you get all addresses of clients including other clusters with `getAllAddrs()`.
-
-You need to call `collectOtherAddrs()` before calling `getAllAddrs()` to get addresses of different clusters.
+You can designate the sender and the receivers with addresses. Please use `boot.GetAllAddrs` to get the addresses.
 
 ```go
-collectOtherAddrs(otherClients)
-addrs := getAllAddrs()
+atxs := []transaction.GeneralTx{
+  {From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{200}},
+}
+transaction.Execute(atxs)
 ```
 
-Before you start creating general transactions, you should make genesis with `createGenesis(serverURLs, owner, amount)`. This function must be called only once among all clusters.
+In this case, transactions (addrs[0] → addrs[1], 200) will be created.
 
-Now, you can designate the sender and the receivers with `addrs`.
+Make sure that the sender has the enough amount of assets.
 
-```go
-tx := generalTx{From: addrs[0], To: []int{addrs[1], addrs[2]}, Amounts: []int{10, 20}}
-```
+Note that in GUI mode, these processes are executed in the backgound.
 
-In this case, transactions (addrs[0] → addrs[1], 10) and (addrs[0] → addrs[2], 20) will be created.
-
-To send a request of the transactions to servers to get their signatures, call `executeTxs()`.
-
-```go
-txs := []{tx}
-executeTxs(serverURLs, txs)
-```
-
-## Benchmarking
+## [WIP] Benchmarking
 
 You can benchmark the programs with `go test` command.
 
