@@ -12,3 +12,8 @@ You can get the details by reading READMEs in each directory ([client](./client)
 
 ## Demo
 ![demo](https://user-images.githubusercontent.com/32924835/82243449-99959b80-997a-11ea-9e65-2c202dda286b.gif)
+
+## Architecture
+![architecture](https://user-images.githubusercontent.com/32924835/82288108-b82c7e80-99dc-11ea-87cd-75995f6d943a.png)
+- [gin-gonic/gin](https://github.com/gin-gonic/gin)
+- [Equanox/gotron](https://github.com/Equanox/gotron)
