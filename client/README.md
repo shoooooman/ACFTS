@@ -26,9 +26,7 @@ You can switch the GUI mode and CUI mode by changing `IsGUI` in  `config/config.
 
 If you choose the GUI mode, a gotron browser will open after running the command.
 
-You may run as much clients as you want, but make sure that each client waits for everyone else to finish the configuration pages.
-
-If all the clients finish the configuration page, please press the ready button and start making transactions!
+You may run as much clients as you want, but make sure that each client waits for everyone else to finish the configuration pages. If all the clients finish the configuration page, please press the ready button and start making transactions!
 
 ### CUI Mode
 
@@ -38,7 +36,7 @@ You can create a request of a new transaction by writing a query in `boot/cui/ex
 
 There are two types of transactions, which are `transaction.GeneralTx` and `transaction.InsideTx`.
 
-### GeneralTx
+#### GeneralTx
 
 `GeneralTx` is defined in `transaction/request.go`.
 
@@ -50,11 +48,9 @@ type GeneralTx struct {
 }
 ```
 
-You can designate the sender (`From`), the receivers (`To`) and amounts for each receiver (`Amounts`).
+You can designate the sender (`From`), the receivers (`To`) and amounts for each receiver (`Amounts`). The orders of `To` and `Amounts` must correspond to each other.
 
-The orders of `To` and `Amounts` must correspond to each other.
-
-### InsideTx
+#### InsideTx
 
 On the other hand, `InsideTx` represents a transaction inside one cluster, which is also defined in `transaction/request.go`.
 
@@ -66,13 +62,11 @@ type InsideTx struct {
 }
 ```
 
-`InsedeTx` has `From`, `To` and `Amounts` as well as `GeneralTx`, but the types of the first two are not `model.Address`, but `int` for simplicity.
-
-It means you can designate the sender and the receivers by the client indices in one cluster.
+`InsedeTx` has `From`, `To` and `Amounts` as well as `GeneralTx`, but the types of the first two are not `model.Address`, but `int` for simplicity. It means you can designate the sender and the receivers by the client indices in one cluster.
 
 You need to convert `InsideTx` to `GeneralTx` with `transaction.ConvertInsideTxs` before making a request as the following step.
 
-### Execution
+#### Execution
 
 In `boot/cui/example.go`, queries can be written in the following format. 
 
@@ -88,6 +82,8 @@ transaction.Execute(atxs)
 In this case, transactions (addrs[0] → addrs[1], 200) will be created.
 
 Make sure that the sender has the enough amount of assets.
+
+Note that in GUI mode, these processes are executed in the backgound.
 
 ## [WIP] Benchmarking
 
