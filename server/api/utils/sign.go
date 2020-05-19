@@ -2,7 +2,7 @@ package utils
 
 import (
 	"acfts/config"
-	"acfts/db/model"
+	"acfts/model"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"

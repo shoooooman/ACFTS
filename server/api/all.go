@@ -1,7 +1,7 @@
 package api
 
 import (
-	"acfts/db/model"
+	"acfts/model"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

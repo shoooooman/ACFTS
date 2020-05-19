@@ -1,6 +1,6 @@
 package utils
 
-import "acfts/db/model"
+import "acfts/model"
 
 // SimpleTransaction is model.Transaction withtout unnecessary properties
 type SimpleTransaction struct {

@@ -2,7 +2,7 @@ package main
 
 import (
 	"acfts/api"
-	"acfts/db/model"
+	"acfts/model"
 	"fmt"
 	"log"
 	"strconv"

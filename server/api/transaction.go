@@ -3,7 +3,7 @@ package api
 import (
 	"acfts/api/utils"
 	"acfts/config"
-	"acfts/db/model"
+	"acfts/model"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
