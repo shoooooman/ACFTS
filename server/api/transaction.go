@@ -1,6 +1,7 @@
 package api
 
 import (
+	"acfts/config"
 	"acfts/db/model"
 	"crypto"
 	"crypto/ecdsa"
@@ -84,7 +85,7 @@ func unlockUTXO(utxo model.Output, signature1, signature2 string) bool {
 	return false
 }
 
-func verifyUTXO(utxo model.Output, siblings []model.Output, n int) bool {
+func verifyUTXO(utxo model.Output, siblings []model.Output) bool {
 	// Genesis is approved without verification
 	if utxo.PreviousHash == "genesis" {
 		fmt.Println("genesis is approved without verification.")
@@ -133,7 +134,7 @@ func verifyUTXO(utxo model.Output, siblings []model.Output, n int) bool {
 		if ecdsa.Verify(&serverPubKey, hashed, signature1, signature2) {
 			valid++
 			fmt.Println("one valid signature")
-			if float64(valid) >= 2.0*float64(n)/3.0 {
+			if float64(valid) >= 2.0*float64(config.NumServers)/3.0 {
 				fmt.Println("Server Verifyed!")
 				return true
 			}
@@ -198,7 +199,7 @@ func convertTransaction(transaction model.Transaction) simpleTransaction {
 }
 
 // VerifyTransaction is
-func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
+func VerifyTransaction(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var transaction model.Transaction
 		c.BindJSON(&transaction)
@@ -273,7 +274,7 @@ func VerifyTransaction(db *gorm.DB, n int) gin.HandlerFunc {
 			// Update gorm.Model of Siblings
 			tx.Where("id <> ? AND previous_hash = ?", utxo.ID, utxo.PreviousHash).
 				Find(&input.Siblings)
-			if !verifyUTXO(utxo, input.Siblings, n) {
+			if !verifyUTXO(utxo, input.Siblings) {
 				c.JSON(http.StatusBadRequest, gin.H{
 					"message": "One of signatures of servers is not valid.",
 				})
