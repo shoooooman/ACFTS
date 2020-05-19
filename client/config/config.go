@@ -37,14 +37,14 @@ var (
 	// Pub2Pri is for getting a private key from a public key (PublicKey.X + PublicKey.Y)
 	Pub2Pri map[string]*ecdsa.PrivateKey
 
-	// Num is
+	// Num is a ID among clients
 	Num int
-	// NumClients is
-	NumClients int
-	// NumClusters is
-	NumClusters int
-	// HasGenesis is
+	// NumClients is the number of clients
+	NumClients = 4
+	// NumClusters is the number of clusters
+	NumClusters = 2
+	// HasGenesis is true if this cluster has the genesis
 	HasGenesis bool
-	// GAmount is
-	GAmount int
+	// GAmount is the amount of the genesis
+	GAmount = 200
 )

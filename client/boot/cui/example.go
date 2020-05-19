@@ -1,16 +1,22 @@
 package cui
 
-import "acfts-client/transaction"
+import (
+	"acfts-client/boot"
+	"acfts-client/model"
+	"acfts-client/transaction"
+)
 
 // ExecuteExamples executes sample transactions
 func ExecuteExamples() {
+	addrs := boot.GetAllAddrs()
+
 	/* Use generalTx */
 
 	// Inside one cluster
-	// atxs := []transaction.GeneralTx{
-	// 	{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{200}},
-	// }
-	// transaction.Execute(atxs)
+	atxs := []transaction.GeneralTx{
+		{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{200}},
+	}
+	transaction.Execute(atxs)
 
 	// atxs := make([]transaction.GeneralTx, 200)
 	// tx := transaction.GeneralTx{From: addrs[0], To: []model.Address{addrs[1]}, Amounts: []int{1}}
@@ -35,11 +41,11 @@ func ExecuteExamples() {
 	/* Use insideTx */
 
 	// case 1: 0 -> 1
-	itxs := []transaction.InsideTx{
-		{From: 0, To: []int{1}, Amounts: []int{200}},
-	}
-	atxs := transaction.ConvertInsideTxs(itxs)
-	transaction.Execute(atxs)
+	// itxs := []transaction.InsideTx{
+	// 	{From: 0, To: []int{1}, Amounts: []int{200}},
+	// }
+	// atxs := transaction.ConvertInsideTxs(itxs)
+	// transaction.Execute(atxs)
 
 	// case 2: 0 <-> 1
 	// tx1 := transaction.InsideTx{From: 0, To: []int{1}, Amounts: []int{200}}

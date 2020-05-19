@@ -15,17 +15,15 @@ func InitCUI() {
 
 	db := config.SetDB(config.Num)
 
-	port := config.BasePort + config.Num
-
 	// Generate private keys
-	config.NumClients = 4
+	port := config.BasePort + config.Num
 	myurl := config.CBase + ":" + strconv.Itoa(port)
 	boot.GenerateClients(myurl)
 
+	// start routing
 	r := boot.SetRouter(db, nil)
 	go r.Run(":" + strconv.Itoa(port))
 
-	config.NumClusters = 1
 	otherClients := boot.GetOtherCURLs(config.Num)
 
 	// 他のクライアントが設定情報を入れるのを待機
