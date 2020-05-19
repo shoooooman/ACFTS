@@ -25,7 +25,7 @@ func InitCUI() {
 	r := boot.SetRouter(db, nil)
 	go r.Run(":" + strconv.Itoa(port))
 
-	config.NumClusters = 1
+	config.NumClusters = 2
 	otherClients := boot.GetOtherCURLs(config.Num)
 
 	// 他のクライアントが設定情報を入れるのを待機
